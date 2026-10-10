@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 AI_SERVICE_ROOT = Path(__file__).resolve().parents[2]
+SUPPORTED_VOYAGE_DIMENSIONS = {256, 512, 1024, 2048}
 
 
 class Settings(BaseSettings):
@@ -55,10 +56,19 @@ class Settings(BaseSettings):
                 "DATABASE_URL is required when VECTOR_STORE_BACKEND=supabase."
             )
 
-        if self.embedding_provider == "voyage" and not self.embedding_api_key:
-            raise ValueError(
-                "EMBEDDING_API_KEY is required when EMBEDDING_PROVIDER=voyage."
-            )
+        if self.embedding_provider == "voyage":
+            if not self.embedding_api_key:
+                raise ValueError(
+                    "EMBEDDING_API_KEY is required when EMBEDDING_PROVIDER=voyage."
+                )
+            if self.embedding_dimensions not in SUPPORTED_VOYAGE_DIMENSIONS:
+                supported = ", ".join(
+                    str(value) for value in sorted(SUPPORTED_VOYAGE_DIMENSIONS)
+                )
+                raise ValueError(
+                    "EMBEDDING_DIMENSIONS for Voyage must be one of: "
+                    f"{supported}."
+                )
 
         return self
 
