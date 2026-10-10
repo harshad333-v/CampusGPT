@@ -10,7 +10,6 @@ delete, or rewrite document chunks, and never prints secret values.
 
 from __future__ import annotations
 
-import sys
 
 from sqlalchemy import text
 
@@ -75,6 +74,11 @@ def main() -> None:
                 {"schema_name": settings.pgvector_schema_name},
             ).mappings().one()
 
+        if info["current_schema"] != settings.pgvector_schema_name:
+            fail(
+                "Unexpected PostgreSQL search_path. Expected current schema "
+                f"{settings.pgvector_schema_name!r}, found {info['current_schema']!r}."
+            )
         if not info["vector_version"]:
             fail("PostgreSQL is reachable, but the pgvector extension is missing.")
         expected_type = f"vector({settings.embedding_dimensions})"
@@ -97,8 +101,9 @@ def main() -> None:
         raise
     except Exception as exc:
         fail(
-            "PostgreSQL connection/schema check failed: "
-            f"{type(exc).__name__}: {exc}"
+            "PostgreSQL connection/schema check failed "
+            f"({type(exc).__name__}). Check DATABASE_URL, password URL-encoding, "
+            "SSL, and the Supabase connection method. Sensitive values were not printed."
         )
 
     # Only send a short test query to Voyage and validate its output shape.
@@ -115,15 +120,19 @@ def main() -> None:
     except SystemExit:
         raise
     except Exception as exc:
-        fail(f"Voyage embedding check failed: {type(exc).__name__}: {exc}")
+        fail(
+            f"Voyage embedding check failed ({type(exc).__name__}). "
+            "Check EMBEDDING_API_KEY, model access, account credits, and rate limits. "
+            "Sensitive values were not printed."
+        )
 
     # PGVector initialization is scoped to the configured collection. The first
     # successful run may create a metadata row for this collection; no documents
     # are inserted or deleted.
     try:
         store = get_vector_store()
-        matches = store.similarity_search(
-            "CampusGPT integration check",
+        matches = store.similarity_search_by_vector(
+            query_embedding,
             k=1,
         )
         print("  Supabase pgvector store: OK")
