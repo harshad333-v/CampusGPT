@@ -19,8 +19,8 @@ from app.core.config import AI_SERVICE_ROOT, get_settings
 def get_embeddings():
     """Build the configured embedding client.
 
-    Local Ollama remains the default for backwards-compatible development.
-    Select Voyage in the environment for hosted embedding generation.
+    Local Ollama remains the default. Use a hosted embedding provider in
+    production, and re-embed all documents when changing embedding models.
     """
 
     settings = get_settings()
@@ -100,14 +100,22 @@ def _postgres_connection_url() -> str:
 
 @lru_cache(maxsize=1)
 def get_postgres_engine() -> Engine:
-    """Create one pooled SQLAlchemy engine per application process."""
+    """Create one pooled engine with the CampusGPT schema first on search_path."""
 
     settings = get_settings()
+    schema = settings.pgvector_schema_name  # Identifier validated by Settings.
+
     return create_engine(
         _postgres_connection_url(),
         pool_pre_ping=True,
         pool_size=settings.database_pool_size,
         max_overflow=settings.database_max_overflow,
+        connect_args={
+            # Keep LangChain's unqualified table names isolated from unrelated
+            # tables in this Supabase project's public schema. extensions is
+            # included so PostgreSQL can resolve the pgvector type/operator class.
+            "options": f"-csearch_path={schema},extensions,public",
+        },
     )
 
 
@@ -152,37 +160,39 @@ def get_vector_store():
 
 
 # ---------------------------------------------------------
-# Document deletion (keeps DELETE endpoint contract unchanged)
+# Document deletion (same DELETE endpoint contract)
 # ---------------------------------------------------------
 
 def delete_document_chunks(document_id: str) -> int:
-    """Delete all chunks for a document using the selected vector backend."""
+    """Delete all chunks for a document within CampusGPT's own schema/collection."""
 
     settings = get_settings()
     vector_store = get_vector_store()
+    ids: list[str] = []
 
     if settings.vector_store_backend == "chroma":
         result = vector_store.get(
             where={"document_id": {"$eq": document_id}}
         )
         ids = result.get("ids", [])
-
         if ids:
             vector_store.delete(ids=ids)
 
     elif settings.vector_store_backend == "supabase":
+        schema = settings.pgvector_schema_name  # Validated identifier.
+        query = text(
+            f"""
+            SELECT e.id
+            FROM "{schema}".langchain_pg_embedding AS e
+            JOIN "{schema}".langchain_pg_collection AS c
+              ON c.uuid = e.collection_id
+            WHERE c.name = :collection_name
+              AND e.cmetadata ->> 'document_id' = :document_id
+            """
+        )
         with get_postgres_engine().connect() as connection:
             ids = connection.execute(
-                text(
-                    """
-                    SELECT e.id
-                    FROM public.langchain_pg_embedding AS e
-                    JOIN public.langchain_pg_collection AS c
-                      ON c.uuid = e.collection_id
-                    WHERE c.name = :collection_name
-                      AND e.cmetadata ->> 'document_id' = :document_id
-                    """
-                ),
+                query,
                 {
                     "collection_name": settings.pgvector_collection_name,
                     "document_id": document_id,
@@ -190,6 +200,7 @@ def delete_document_chunks(document_id: str) -> int:
             ).scalars().all()
 
         if ids:
+            # IDs are only deleted in the configured collection.
             vector_store.delete(ids=list(ids), collection_only=True)
 
     else:
