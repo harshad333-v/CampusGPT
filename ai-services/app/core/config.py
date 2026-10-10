@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
+import re
 from typing import Literal
 
 from pydantic import Field, SecretStr, model_validator
@@ -30,15 +31,13 @@ class Settings(BaseSettings):
     gemini_base_url: str = "http://127.0.0.1:8081/v1"
     gemini_api_key: SecretStr = SecretStr("not-needed")
 
-    # Keep the current local setup as the default. Production can opt into
-    # a hosted embedding provider without changing the RAG pipeline.
+    # Local defaults preserve current development behavior.
     embedding_provider: Literal["ollama", "voyage"] = "ollama"
     embedding_model: str = "nomic-embed-text:latest"
     embedding_api_key: SecretStr | None = None
     embedding_dimensions: int = Field(default=768, ge=1)
     ollama_base_url: str = "http://127.0.0.1:11434"
 
-    # Chroma remains the default until the Supabase environment is configured.
     vector_store_backend: Literal["chroma", "supabase"] = "chroma"
     chroma_persist_directory: str = "chroma_db"
     chroma_collection_name: str = "campusgpt"
@@ -46,6 +45,7 @@ class Settings(BaseSettings):
     # Server-side PostgreSQL connection. Never expose this to the frontend.
     database_url: SecretStr | None = None
     pgvector_collection_name: str = "campusgpt"
+    pgvector_schema_name: str = "campusgpt"
     database_pool_size: int = Field(default=5, ge=1, le=50)
     database_max_overflow: int = Field(default=5, ge=0, le=100)
 
@@ -69,6 +69,11 @@ class Settings(BaseSettings):
                     "EMBEDDING_DIMENSIONS for Voyage must be one of: "
                     f"{supported}."
                 )
+
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", self.pgvector_schema_name):
+            raise ValueError(
+                "PGVECTOR_SCHEMA_NAME must be a valid PostgreSQL schema identifier."
+            )
 
         return self
 
