@@ -35,7 +35,6 @@ def get_embeddings():
         from langchain_voyageai import VoyageAIEmbeddings
 
         if settings.embedding_api_key is None:
-            # Also checked by Settings; retained here for clearer local errors.
             raise RuntimeError(
                 "EMBEDDING_API_KEY is required for the Voyage embedding provider."
             )
@@ -136,8 +135,6 @@ def get_vector_store():
         )
 
     if settings.vector_store_backend == "supabase":
-        # Import only when this backend is selected; Chroma-only local runs
-        # do not need to initialize PostgreSQL objects.
         from langchain_postgres import PGVector
 
         return PGVector(
@@ -146,8 +143,6 @@ def get_vector_store():
             connection=get_postgres_engine(),
             embedding_length=settings.embedding_dimensions,
             use_jsonb=True,
-            # Enable pgvector in Supabase via a SQL migration/console, not
-            # automatically from the application runtime.
             create_extension=False,
         )
 
@@ -172,17 +167,17 @@ def delete_document_chunks(document_id: str) -> int:
         )
         ids = result.get("ids", [])
 
+        if ids:
+            vector_store.delete(ids=ids)
+
     elif settings.vector_store_backend == "supabase":
-        # langchain-postgres stores metadata in cmetadata and associates each
-        # chunk with a named collection. Scope deletion to CampusGPT's
-        # configured collection and the exact application document ID.
         with get_postgres_engine().connect() as connection:
             ids = connection.execute(
                 text(
                     """
                     SELECT e.id
-                    FROM langchain_pg_embedding AS e
-                    JOIN langchain_pg_collection AS c
+                    FROM public.langchain_pg_embedding AS e
+                    JOIN public.langchain_pg_collection AS c
                       ON c.uuid = e.collection_id
                     WHERE c.name = :collection_name
                       AND e.cmetadata ->> 'document_id' = :document_id
@@ -193,12 +188,13 @@ def delete_document_chunks(document_id: str) -> int:
                     "document_id": document_id,
                 },
             ).scalars().all()
+
+        if ids:
+            vector_store.delete(ids=list(ids), collection_only=True)
+
     else:
         raise RuntimeError(
             f"Unsupported vector store backend: {settings.vector_store_backend}"
         )
-
-    if ids:
-        vector_store.delete(ids=list(ids))
 
     return len(ids)
