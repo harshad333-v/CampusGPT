@@ -35,7 +35,7 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Compile application
-        run: python -m compileall -q app
+        run: python -m compileall -q app scripts
 
       - name: Test environment configuration
         run: python -m pytest -q tests/test_config.py
