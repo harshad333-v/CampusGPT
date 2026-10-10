@@ -8,8 +8,9 @@ from app.models.documents import (
 
 from app.rag.ingestion import ingest_document
 from app.rag.vector_store import (
-    get_vector_store,
+    delete_document_chunks,
     generate_document_ids,
+    get_vector_store,
 )
 
 
@@ -88,28 +89,12 @@ def delete_document(
 ) -> DocumentDeleteResponse:
 
     try:
-        vector_store = get_vector_store()
-
-        # Get all chunks belonging to this document.
-        result = vector_store.get(
-            where={
-                "document_id": {
-                    "$eq": document_id
-                }
-            }
-        )
-
-        ids = result.get("ids", [])
-
-        if ids:
-            vector_store.delete(
-                ids=ids
-            )
+        chunks_deleted = delete_document_chunks(document_id)
 
         return DocumentDeleteResponse(
             success=True,
             document_id=document_id,
-            chunks_deleted=len(ids),
+            chunks_deleted=chunks_deleted,
         )
 
     except Exception as exc:
