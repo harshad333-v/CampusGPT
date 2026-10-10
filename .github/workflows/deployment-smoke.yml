@@ -40,7 +40,10 @@ jobs:
       - name: Test environment configuration
         run: python -m pytest -q tests/test_config.py
 
-      - name: Smoke-test API contract
+      - name: Verify unchanged API contract
+        run: python -m pytest -q tests/test_deployment_contract.py
+
+      - name: Smoke-test API behavior
         run: >-
           python -m pytest -q tests/test_api.py
           -k "test_health or test_chat_greeting or test_chat_empty_message"
