@@ -1,6 +1,6 @@
 # CampusGPT AI Service — Deployment Notes
 
-These files prepare the existing AI service in this repository for container deployment. They do not create a second application.
+This deployment work targets the existing AI service in this repository. It does not create a second application.
 
 ## Non-negotiable compatibility requirements
 
@@ -9,58 +9,66 @@ These files prepare the existing AI service in this repository for container dep
   - POST /v1/chat
   - POST /v1/documents/ingest
   - DELETE /v1/documents/{document_id}
-- Preserve the current NLP → routing → retrieval → context → Gemini-compatible generation workflow.
-- Changes in this branch are behind the existing API boundary.
-- Do not commit real credentials or expose database/embedding/gateway keys to the frontend.
+- Preserve the current NLP → routing → retrieval → context → Gemini-compatible generation RAG workflow.
+- Keep credentials out of source files, Git, container images, and frontend variables.
+- Current local development defaults remain Chroma + Ollama.
 
-## Configuration
+## Local .env configuration
 
-1. Copy `.env.example` to `.env` from the `ai-services` directory for local development.
-2. Keep the default `VECTOR_STORE_BACKEND=chroma` and `EMBEDDING_PROVIDER=ollama` for the existing local setup.
-3. Production should use the deployment platform's secret store to configure `DATABASE_URL`, `EMBEDDING_API_KEY`, `GEMINI_BASE_URL`, and `GEMINI_API_KEY`.
-4. To use Supabase, configure `VECTOR_STORE_BACKEND=supabase`, `EMBEDDING_PROVIDER=voyage`, the matching model/dimension values, and a secure server-side PostgreSQL connection string. The direct database URL must include SSL (commonly `sslmode=require`); use the Supabase-provided connection string or pooler for the chosen hosting environment.
-5. Enable the pgvector extension in Supabase before starting the backend with the Supabase vector backend.
-6. Re-index all chunks using the selected embedding model before serving production queries. Vectors from `nomic-embed-text` are not compatible with Voyage vectors.
-7. Do not point the production process at the development Chroma directory.
+1. From ai-services, copy .env.example to .env.
+2. For local development, leave VECTOR_STORE_BACKEND=chroma and EMBEDDING_PROVIDER=ollama.
+3. To test against the existing Supabase project, configure these values in your local .env:
+   - VECTOR_STORE_BACKEND=supabase
+   - EMBEDDING_PROVIDER=voyage
+   - EMBEDDING_MODEL=voyage-4-lite
+   - EMBEDDING_DIMENSIONS=1024
+   - EMBEDDING_API_KEY = your Voyage API key
+   - DATABASE_URL = the project connection string from Supabase Dashboard → Connect, with the database password URL-encoded and sslmode=require
+   - PGVECTOR_COLLECTION_NAME=campusgpt
+4. Do not send the actual password/key through chat and never commit .env.
+5. The direct database host is db.uoopgnbpdazpuokjduol.supabase.co. If your network is IPv4-only and direct connection fails, use the Supabase Session pooler connection string shown in Dashboard → Connect. Supabase documents direct connections for long-lived backends and session pooling for persistent clients on IPv4-only networks: https://supabase.com/docs/guides/database/connecting-to-postgres
+6. When selecting the Supabase backend, embedding dimensions must match the database vector column. The provisioned embedding column is extensions.vector(1024).
+
+## Supabase database setup
+
+The connected project has pgvector 0.8.0 installed in the extensions schema. These internal LangChain vector tables have been created:
+- public.langchain_pg_collection
+- public.langchain_pg_embedding
+
+The embedding table uses a 1024-dimensional vector, HNSW cosine index, a JSONB metadata index, and a collection filter index. Row-level security is enabled and direct table grants are revoked from anon and authenticated; the application should connect server-side with its PostgreSQL connection string, not a browser key.
+
+For repeatable project setup, the SQL files are:
+1. migrations/001_enable_pgvector.sql
+2. migrations/002_create_search_indexes.sql
+
+These SQL files are safe to re-run for the current schema, but dimension changes require a planned migration/reindex—not an in-place blind change.
 
 ## Docker smoke test
 
 From this directory:
 
-```powershell
-docker build -t campusgpt-ai:deployment .
-docker run --rm -p 8000:8000 --env-file .env campusgpt-ai:deployment
-```
+    docker build -t campusgpt-ai:deployment .
+    docker run --rm -p 8000:8000 --env-file .env campusgpt-ai:deployment
 
 Then verify the existing health route:
 
-```powershell
-Invoke-RestMethod http://localhost:8000/health
-```
+    Invoke-RestMethod http://localhost:8000/health
 
-The Docker image intentionally excludes `.env`, local vector data, development documents, and Git metadata. Runtime secrets are passed separately.
+The Docker image intentionally excludes .env, local vector data, development documents, and Git metadata. Runtime secrets are passed separately.
 
-## Supabase notes
+## Important ingestion hosting caveat
 
-- The backend connects directly to PostgreSQL using `DATABASE_URL`; a Supabase service-role REST key is not needed for the current pgvector approach.
-- The configured LangChain PostgreSQL vector store creates/uses its own `langchain_pg_collection` and `langchain_pg_embedding` tables in the selected database schema. The database account needs the required table/index permissions during initial setup.
-- Run `migrations/001_enable_pgvector.sql` in the Supabase SQL editor first.
-- Launch the backend once with the Supabase backend configured to initialize the LangChain tables, then run `migrations/002_create_search_indexes.sql` to add metadata and HNSW indexes.
-- Test the complete Supabase path in staging before switching production traffic.
-- PostgreSQL document deletion is implemented internally by selecting chunk IDs scoped to the configured collection and exact `document_id`; the public DELETE endpoint remains unchanged.
-
-## Document ingestion caveat
-
-The existing ingestion endpoint accepts a server-side `file_path`. The container image excludes development PDFs by design. At deployment time, the provided path must resolve to a file visible to the running container. Coordinate with the backend teammate on the existing file-storage handoff. If the current backend passes a Windows host path, that path will not exist inside a cloud container; fix the internal storage resolution without changing the endpoint's request schema.
+The existing ingestion endpoint accepts a server-side file_path. In a cloud container, a Windows developer path will not exist unless the file is made available inside the container. Coordinate with the backend teammate on the existing file-storage handoff. Do not change the endpoint request schema; solve path resolution/storage behind it.
 
 ## Before production launch
 
-- Confirm the Gemini WebSocket gateway is suitable for production use, and configure its secure reachable URL and authentication.
-- Configure database backups, HTTPS, rate limits, log redaction, error tracking, and rollback.
-- Preserve the existing document authorization contract: the Node/Express backend continues sending authorized document IDs as it does today.
-- Load-test chat and the Gemini gateway at 10, 20, and 50 concurrent requests.
-- Keep the old Chroma data available until the migration and retrieval comparisons pass.
+- Confirm the Gemini WebSocket gateway can be reached from the hosting region and is suitable for production use.
+- Configure backup/recovery, HTTPS, rate limiting, log redaction, error tracking, and deployment rollback.
+- Keep the existing document authorization contract: the Node/Express backend continues sending the authorized document IDs.
+- Re-embed every chunk with voyage-4-lite before using Supabase for retrieval. Local nomic-embed-text vectors are not compatible.
+- Verify authorization, English/Hinglish retrieval tests, latency, and load at 10/20/50 concurrent users.
+- Do not remove the existing Chroma data until cutover checks and rollback have passed.
 
 ## Scope
 
-This branch adds deployment configuration and a selectable PostgreSQL/Voyage adapter behind the existing RAG interface. It does not change API routes or response models, and it does not provision any cloud services or perform a data migration.
+The implementation adds deployment configuration and a selectable Supabase/Voyage adapter behind the existing vector-store interface. It intentionally does not change public endpoints or response schemas. It does not deploy the backend or perform a production data migration.
