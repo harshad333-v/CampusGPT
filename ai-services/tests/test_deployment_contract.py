@@ -16,13 +16,13 @@ EXPECTED_PUBLIC_ROUTES = {
 
 
 def test_existing_public_routes_and_methods_are_preserved():
+    # Use FastAPI's generated OpenAPI schema as the public route contract.
+    # Newer FastAPI versions can defer included-router expansion in app.routes.
+    paths = app.openapi()["paths"]
     actual = {
-        (method, route.path)
-        for route in app.routes
-        if getattr(route, "path", "") == "/health"
-        or getattr(route, "path", "").startswith("/v1/")
-        for method in getattr(route, "methods", set())
-        if method not in {"HEAD", "OPTIONS"}
+        (method.upper(), path)
+        for path, operations in paths.items()
+        for method in operations
     }
 
     assert actual == EXPECTED_PUBLIC_ROUTES
