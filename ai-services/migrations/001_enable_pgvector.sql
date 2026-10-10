@@ -1,4 +1,4 @@
--- Run this migration in the Supabase SQL Editor before selecting
--- VECTOR_STORE_BACKEND=supabase. Supabase may already have the extension;
--- IF NOT EXISTS makes this safe to re-run.
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Enable pgvector in Supabase's recommended extensions schema.
+-- Safe to re-run in the existing CampusGPT Supabase project.
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
