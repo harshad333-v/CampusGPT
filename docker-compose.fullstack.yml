@@ -1,0 +1,83 @@
+services:
+  shared-storage-init:
+    image: alpine:3.20
+    user: "0:0"
+    command: ["sh", "-c", "mkdir -p /shared-documents && chown 1000:1000 /shared-documents && chmod 775 /shared-documents"]
+    volumes:
+      - campusgpt-documents:/shared-documents
+    restart: "no"
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: ai-services/Dockerfile.fullstack
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: INFO
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-http://host.docker.internal:8081/v1}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-not-needed}
+      VECTOR_STORE_BACKEND: supabase
+      EMBEDDING_PROVIDER: voyage
+      EMBEDDING_MODEL: voyage-4-lite
+      EMBEDDING_DIMENSIONS: "1024"
+      EMBEDDING_API_KEY: ${VOYAGE_API_KEY:?Set VOYAGE_API_KEY in .env.fullstack}
+      DATABASE_URL: ${AI_DATABASE_URL:?Set AI_DATABASE_URL in .env.fullstack}
+      PGVECTOR_COLLECTION_NAME: campusgpt
+      PGVECTOR_SCHEMA_NAME: campusgpt
+      DATABASE_POOL_SIZE: "5"
+      DATABASE_MAX_OVERFLOW: "5"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - campusgpt-documents:/shared-documents
+    expose:
+      - "8000"
+    depends_on:
+      shared-storage-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      NODE_ENV: development
+      PORT: "4000"
+      CLIENT_ORIGIN: http://localhost:5173
+      DATABASE_URL: ${CAMPUS_DATABASE_URL:?Set CAMPUS_DATABASE_URL in .env.fullstack}
+      DATABASE_SSL: "true"
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.fullstack}
+      COOKIE_NAME: campusgpt_session
+      COOKIE_SECURE: "false"
+      AI_SERVICE_URL: http://ai-service:8000
+      AI_TIMEOUT_MS: "120000"
+      SHARED_DOCUMENTS_DIR: /shared-documents
+      MAX_UPLOAD_MB: "20"
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-CampusGPT Administrator}
+    command: ["sh", "-c", "npm run migrate && npm start"]
+    ports:
+      - "4000:4000"
+    volumes:
+      - campusgpt-documents:/shared-documents
+    depends_on:
+      shared-storage-init:
+        condition: service_completed_successfully
+      ai-service:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  campusgpt-documents:
