@@ -153,7 +153,7 @@ router.post("/:documentId/access", requireAuth, requireRole("admin"), asyncHandl
   if (!parsed.success) throw new HttpError(400, "A valid userId is required.", "VALIDATION_ERROR");
 
   const document = await pool.query(
-    "SELECT document_id FROM campus_app.documents WHERE document_id = $1`,
+    "SELECT document_id FROM campus_app.documents WHERE document_id = $1",
     [req.params.documentId]
   );
   if (!document.rows[0]) throw new HttpError(404, "Document not found.", "DOCUMENT_NOT_FOUND");
@@ -210,7 +210,7 @@ router.post("/:documentId/reindex", requireAuth, requireRole("staff", "admin"), 
   } catch (error) {
     await pool.query(
       `UPDATE campus_app.documents
-          SET ingest_status = 'failed', error_message = 'Reindexing failed; inspect AI service logs.', updated_at = now() WHERE document_id = $1",
+          SET ingest_status = 'failed', error_message = 'Reindexing failed; inspect AI service logs.', updated_at = now() WHERE document_id = $1`,
       [row.document_id]
     );
     throw new HttpError(502, "Document reindexing failed. Inspect the AI service logs and retry.", "REINDEX_FAILED");
