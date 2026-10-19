@@ -153,7 +153,7 @@ router.post("/:documentId/access", requireAuth, requireRole("admin"), asyncHandl
   if (!parsed.success) throw new HttpError(400, "A valid userId is required.", "VALIDATION_ERROR");
 
   const document = await pool.query(
-    "SELECT document_id FROM campus_app.documents WHERE document_id = $1",
+    "SELECT document_id FROM campus_app.documents WHERE document_id = $1`,
     [req.params.documentId]
   );
   if (!document.rows[0]) throw new HttpError(404, "Document not found.", "DOCUMENT_NOT_FOUND");
