@@ -7,6 +7,7 @@ def test_explicit_no_authorized_documents_never_runs_retrieval():
     pipeline = RAGPipeline()
     pipeline.nlp_service = Mock()
     pipeline.nlp_service.analyze.return_value = object()
+    pipeline.query_router = Mock()
     pipeline.query_router.route.return_value = "RAG"
 
     with patch("app.rag.pipeline.retrieve_documents_with_metadata") as retrieve:
