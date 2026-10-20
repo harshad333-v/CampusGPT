@@ -47,3 +47,19 @@ def test_exam_schedule_query_does_not_accept_unrelated_document_types():
     )
 
     assert pipeline._documents_are_relevant(query, [syllabus]) is False
+
+
+def test_midterm_wording_routes_to_exam_schedule_intent():
+    from app.nlp.classifier import classify_query
+
+    result = classify_query("When will midterms start?")
+    assert result.query_type == "DOCUMENT"
+    assert result.intent == "exam_schedule"
+
+
+def test_midterm_examination_wording_routes_to_exam_schedule_intent():
+    from app.nlp.classifier import classify_query
+
+    result = classify_query("When are the midterm examinations?")
+    assert result.query_type == "DOCUMENT"
+    assert result.intent == "exam_schedule"
