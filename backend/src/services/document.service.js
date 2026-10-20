@@ -92,6 +92,8 @@ async function createDocumentService({
       uploadedBy,
       uploadedByRole,
     });
+    document.aiDocumentId = String(document._id);
+    await document.save();
 
     await indexStoredDocument(document._id);
   } catch (error) {
