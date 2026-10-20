@@ -125,11 +125,12 @@ def build_metadata_filter(
     Build a retrieval filter based on NLP intent and entities.
 
     Retrieval strategy:
-        timetable -> timetable records
-        faculty   -> timetable records
-        syllabus  -> SYLLABUS documents
-        holiday   -> HOLIDAY_NOTICE documents
-        event     -> NOTICE or EVENT_NOTICE documents
+        timetable     -> timetable records
+        faculty       -> timetable records
+        syllabus      -> SYLLABUS documents
+        holiday       -> HOLIDAY_NOTICE documents
+        event         -> NOTICE or EVENT_NOTICE documents
+        exam_schedule -> EXAM_SCHEDULE, NOTICE, or CIRCULAR documents
     """
 
     entities = nlp_result.entities
@@ -225,6 +226,38 @@ def build_metadata_filter(
             )
 
     # ===============================================================
+    # EXAM SCHEDULES AND EXAMINATION NOTICES
+    # ===============================================================
+
+    elif intent == "exam_schedule":
+        # Examination information is often uploaded as a general notice
+        # rather than categorized as an EXAM_SCHEDULE. Search all supported
+        # exam-related document categories so the type inferred from the
+        # question does not exclude the notice that contains the answer.
+        conditions.append(
+            _in(
+                "document_type",
+                ["EXAM_SCHEDULE", "NOTICE", "CIRCULAR"],
+            )
+        )
+
+        if entities.department:
+            conditions.append(
+                _eq(
+                    "department",
+                    entities.department,
+                )
+            )
+
+        if entities.semester is not None:
+            conditions.append(
+                _eq(
+                    "semester",
+                    entities.semester,
+                )
+            )
+
+    # ===============================================================
     # SYLLABUS
     # ===============================================================
 
@@ -282,6 +315,7 @@ def build_metadata_filter(
             "holiday",
             "syllabus",
             "event",
+            "exam_schedule",
         }
     ):
         conditions.append(

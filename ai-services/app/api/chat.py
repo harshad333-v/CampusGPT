@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 
 from app.models.chat import ChatRequest, ChatResponse, Source
 from app.rag.pipeline import RAGPipeline
@@ -16,11 +16,18 @@ rag_pipeline = RAGPipeline()
     "/chat",
     response_model=ChatResponse,
 )
-def chat(request: ChatRequest) -> ChatResponse:
+def chat(
+    request: ChatRequest,
+    deny_document_retrieval: bool = Header(
+        default=False,
+        alias="X-CampusGPT-Deny-Document-Retrieval",
+    ),
+) -> ChatResponse:
     result = rag_pipeline.run(
         query=request.message,
         accessible_document_ids=request.accessible_document_ids,
         conversation=request.conversation,
+        deny_document_retrieval=deny_document_retrieval,
     )
 
     # ---------------------------------------------------------------

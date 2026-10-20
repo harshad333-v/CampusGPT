@@ -35,6 +35,9 @@ DOCUMENT_KEYWORDS = {
 
     "exam",
     "examination",
+    "midterm",
+    "midterms",
+    "mid-term",
     "schedule",
     "timetable",
 
@@ -263,6 +266,13 @@ INTENT_KEYWORDS = {
     "exam_schedule": {
         "exam",
         "examination",
+        "midterm",
+        "midterms",
+        "mid-term",
+        "midterm exam",
+        "midterm examination",
+        "mid-term exam",
+        "mid-term examination",
         "exam date",
         "exam schedule",
         "examination schedule",
@@ -472,6 +482,10 @@ def detect_intent(text: str) -> str | None:
     # -----------------------------------------------------------------------
 
     specific_phrases = {
+        "midterm examination": "exam_schedule",
+        "midterm exam": "exam_schedule",
+        "mid-term examination": "exam_schedule",
+        "mid-term exam": "exam_schedule",
         "exam schedule": "exam_schedule",
         "exam date": "exam_schedule",
         "examination schedule": "exam_schedule",

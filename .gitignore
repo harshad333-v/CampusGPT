@@ -18,6 +18,15 @@ __pycache__/
 **/.env
 **/.env.*
 !**/.env.example
+!/.env.fullstack.example
+.env.fullstack
+backend/.env
+frontend/.env
+
+# Node/build artifacts
+**/node_modules/
+frontend/dist/
+backend/coverage/
 
 # Testing
 **/.pytest_cache/
@@ -26,6 +35,10 @@ __pycache__/
 
 # Local vector databases
 **/chroma_db/
+
+# Runtime document storage
+shared-documents/*
+!shared-documents/.gitkeep
 
 # Logs
 **/*.log

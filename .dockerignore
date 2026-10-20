@@ -1,0 +1,18 @@
+# Keep secrets, development artifacts, and the PDF corpus out of build context.
+.git
+.env
+.env.*
+!.env.fullstack.example
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/dist
+**/.venv
+**/venv
+**/__pycache__
+**/.pytest_cache
+**/chroma_db
+ai-services/data/
+shared-documents/*
+!shared-documents/.gitkeep

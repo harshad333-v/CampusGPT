@@ -1,0 +1,128 @@
+services:
+  mongo:
+    image: mongo:7
+    command: ["mongod", "--bind_ip_all"]
+    volumes:
+      - campusgpt-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    volumes:
+      - campusgpt-ollama-data:/root/.ollama
+    expose:
+      - "11434"
+    restart: unless-stopped
+
+  ollama-model-init:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["until ollama list >/dev/null 2>&1; do sleep 2; done; ollama pull ${OLLAMA_MODEL:-nomic-embed-text:latest}"]
+    depends_on:
+      ollama:
+        condition: service_started
+    restart: "no"
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: ai-services/Dockerfile.fullstack
+    environment:
+      APP_ENV: development
+      LOG_LEVEL: INFO
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-http://host.docker.internal:8081/v1}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-not-needed}
+      VECTOR_STORE_BACKEND: chroma
+      EMBEDDING_PROVIDER: ollama
+      EMBEDDING_MODEL: ${OLLAMA_MODEL:-nomic-embed-text:latest}
+      EMBEDDING_DIMENSIONS: "768"
+      OLLAMA_BASE_URL: http://ollama:11434
+      CHROMA_PERSIST_DIRECTORY: /app/chroma_db
+      CHROMA_COLLECTION_NAME: campusgpt
+      TESSERACT_CMD: /usr/bin/tesseract
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - campusgpt-chroma-data:/app/chroma_db
+      - campusgpt-documents:/shared-documents
+      - ./ai-services/data:/seed-documents:ro
+    expose:
+      - "8000"
+    depends_on:
+      ollama-model-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      CLIENT_ORIGIN: http://localhost:5173,http://localhost:3000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/campusgpt}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.fullstack}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      COOKIE_NAME: campusgpt_session
+      COOKIE_SECURE: "false"
+      AI_SERVICE_URL: http://ai-service:8000
+      AI_TIMEOUT_MS: "120000"
+      SHARED_DOCUMENTS_DIR: /shared-documents
+      SEED_DOCUMENTS_DIR: /seed-documents
+      MAX_UPLOAD_MB: "20"
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASS: ${EMAIL_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-CampusGPT}
+    volumes:
+      - campusgpt-documents:/shared-documents
+      - ./ai-services/data:/seed-documents:ro
+    ports:
+      - "4000:4000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api/v1
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  campusgpt-mongo-data:
+  campusgpt-ollama-data:
+  campusgpt-chroma-data:
+  campusgpt-documents:

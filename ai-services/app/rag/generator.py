@@ -1,23 +1,17 @@
-import os
-
 from langchain_openai import ChatOpenAI
 
+from app.core.config import get_settings
 from app.models.chat import ConversationMessage
 
 
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
-GEMINI_BASE_URL = os.getenv(
-    "GEMINI_BASE_URL",
-    "http://127.0.0.1:8081/v1",
-)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "not-needed")
-
-
 def get_llm() -> ChatOpenAI:
+    """Use the existing Gemini-compatible gateway from environment settings."""
+
+    settings = get_settings()
     return ChatOpenAI(
-        model=MODEL_NAME,
-        base_url=GEMINI_BASE_URL,
-        api_key=GEMINI_API_KEY,
+        model=settings.gemini_model,
+        base_url=settings.gemini_base_url,
+        api_key=settings.gemini_api_key.get_secret_value(),
         temperature=0,
     )
 

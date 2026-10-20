@@ -1,0 +1,52 @@
+name: Deployment smoke checks
+
+on:
+  pull_request:
+    branches: [ai-dev]
+    paths:
+      - "ai-services/**"
+      - ".github/workflows/deployment-smoke.yml"
+  push:
+    branches: [deployment/hardening]
+    paths:
+      - "ai-services/**"
+      - ".github/workflows/deployment-smoke.yml"
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-services
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ai-services/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Compile application
+        run: python -m compileall -q app scripts
+
+      - name: Test environment configuration
+        run: python -m pytest -q tests/test_config.py
+
+      - name: Verify unchanged API contract
+        run: python -m pytest -q tests/test_deployment_contract.py
+
+      - name: Smoke-test API behavior
+        run: >-
+          python -m pytest -q tests/test_api.py
+          -k "test_health or test_chat_greeting or test_chat_empty_message"
+
+      - name: Build production container
+        run: docker build -t campusgpt-ai:ci .

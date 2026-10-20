@@ -126,6 +126,21 @@ class RAGPipeline:
             return False
 
         # ---------------------------------------------------------
+        # EXAM SCHEDULES AND EXAMINATION NOTICES
+        # ---------------------------------------------------------
+
+        if intent == "exam_schedule":
+            return any(
+                document.metadata.get("document_type")
+                in {
+                    "EXAM_SCHEDULE",
+                    "NOTICE",
+                    "CIRCULAR",
+                }
+                for document in documents
+            )
+
+        # ---------------------------------------------------------
         # SYLLABUS
         # ---------------------------------------------------------
 
@@ -213,6 +228,7 @@ class RAGPipeline:
         top_k: int = 5,
         accessible_document_ids: list[str] | None = None,
         conversation: list[ConversationMessage] | None = None,
+        deny_document_retrieval: bool = False,
     ) -> RAGResult:
 
         # ---------------------------------------------------------
@@ -256,6 +272,19 @@ class RAGPipeline:
                     "related to your college, courses, exams, "
                     "timetable, notices, holidays, or other "
                     "campus information."
+                ),
+                documents=[],
+                grounded=False,
+            )
+
+        # An empty access allow-list is ambiguous in the legacy public API.
+        # The trusted backend can set this explicit flag when authorization found
+        # no visible documents, preventing empty-list retrieval from becoming an
+        # unrestricted search.
+        if deny_document_retrieval:
+            return RAGResult(
+                answer=(
+                    "I couldn't find this information in the available college documents."
                 ),
                 documents=[],
                 grounded=False,
