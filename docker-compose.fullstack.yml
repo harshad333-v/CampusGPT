@@ -55,6 +55,7 @@ services:
     volumes:
       - campusgpt-chroma-data:/app/chroma_db
       - campusgpt-documents:/shared-documents
+      - ./ai-services/data:/seed-documents:ro
     expose:
       - "8000"
     depends_on:
@@ -83,6 +84,7 @@ services:
       AI_SERVICE_URL: http://ai-service:8000
       AI_TIMEOUT_MS: "120000"
       SHARED_DOCUMENTS_DIR: /shared-documents
+      SEED_DOCUMENTS_DIR: /seed-documents
       MAX_UPLOAD_MB: "20"
       EMAIL_HOST: ${EMAIL_HOST:-}
       EMAIL_PORT: ${EMAIL_PORT:-587}
@@ -91,6 +93,7 @@ services:
       EMAIL_FROM: ${EMAIL_FROM:-CampusGPT}
     volumes:
       - campusgpt-documents:/shared-documents
+      - ./ai-services/data:/seed-documents:ro
     ports:
       - "4000:4000"
     depends_on:
