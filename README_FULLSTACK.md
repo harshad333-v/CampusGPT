@@ -183,7 +183,22 @@ python -m pytest -v
 python scripts/check_local_setup.py
 ```
 
-Then perform a live smoke test: sign in as an administrator, teacher, and student; submit a campus question in both student and teacher chat; verify a grounded answer shows sources; verify a student cannot retrieve a `TEACHER_ONLY` document; upload a PDF/DOCX as a teacher/admin; ask a question covered by that document; then update and delete it and confirm retrieval follows those changes.
+Use the end-to-end checker from the repository root after the services are running:
+
+```powershell
+# Local multi-terminal development (frontend :3000, backend :4000, AI :8000)
+.\scripts\verify_fullstack.ps1
+
+# Actual login -> chat session -> backend -> AI -> grounded answer/source check
+.\scripts\verify_fullstack.ps1 -ChatSmokeTest -LoginEmail admin@your-college.edu
+
+# Docker Compose (AI service is intentionally private, so skip its direct host health URL)
+.\scripts\verify_fullstack.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:4000 -SkipAIHealth -ChatSmokeTest -LoginEmail admin@your-college.edu
+```
+
+The smoke test prompts for the password as a secure input, does not print the access token, creates a chat session, and leaves that test session in the UI so you can inspect it. Its default question depends on the bundled Raksha Bandhan notice being indexed and visible to the test account. For Docker mode the AI health check is skipped because the AI port is not published; the authenticated chat request still exercises the backend-to-AI path.
+
+Then perform a manual role/access smoke test: sign in separately as an administrator, teacher, and student; submit a campus question in both student and teacher chat; verify a grounded answer shows sources; verify a student cannot retrieve a `TEACHER_ONLY` document; upload a PDF/DOCX as a teacher/admin; ask a question covered by that document; then update and delete it and confirm retrieval follows those changes. Frontend routes also guard role-specific pages, while backend authorization remains the security boundary.
 
 ## Security and operational notes
 
