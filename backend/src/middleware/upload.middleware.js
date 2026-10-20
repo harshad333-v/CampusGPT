@@ -20,19 +20,17 @@ const storage = multer.diskStorage({
   },
 });
 
+// Keep the accepted formats aligned with the AI service's supported loaders.
 const allowedTypes = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "application/vnd.ms-powerpoint",
 ]);
 
 const fileFilter = (_req, file, cb) => {
   if (allowedTypes.has(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Only PDF, DOC, DOCX, PPT and PPTX files are allowed"), false);
+    cb(new Error("Only PDF and DOCX files are supported for AI indexing"), false);
   }
 };
 
