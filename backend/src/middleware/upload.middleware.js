@@ -1,52 +1,45 @@
+const fs = require("fs");
 const multer = require("multer");
 const path = require("path");
+const crypto = require("crypto");
+
+const uploadDirectory = path.resolve(
+  process.env.SHARED_DOCUMENTS_DIR || path.join(__dirname, "../../uploads"),
+);
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "src/uploads/");
+  destination: (_req, _file, cb) => {
+    fs.mkdir(uploadDirectory, { recursive: true }, (error) => cb(error, uploadDirectory));
   },
-
-  filename: (req, file, cb) => {
-    const uniqueName =
-      Date.now() +
-      "-" +
-      file.originalname.replace(/\s+/g, "_");
-
-    cb(null, uniqueName);
+  filename: (_req, file, cb) => {
+    const safeBaseName = path
+      .basename(file.originalname || "document")
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .slice(-150);
+    cb(null, `${Date.now()}-${crypto.randomBytes(6).toString("hex")}-${safeBaseName}`);
   },
 });
 
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = [
-    "application/pdf",
+const allowedTypes = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.ms-powerpoint",
+]);
 
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-
-    "application/msword",
-
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-
-    "application/vnd.ms-powerpoint",
-  ];
-
-  if (allowedTypes.includes(file.mimetype)) {
+const fileFilter = (_req, file, cb) => {
+  if (allowedTypes.has(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(
-      new Error(
-        "Only PDF, DOC, DOCX, PPT and PPTX files are allowed"
-      ),
-      false
-    );
+    cb(new Error("Only PDF, DOC, DOCX, PPT and PPTX files are allowed"), false);
   }
 };
 
-const upload = multer({
+module.exports = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 20 * 1024 * 1024,
+    fileSize: Number(process.env.MAX_UPLOAD_MB || 20) * 1024 * 1024,
   },
 });
-
-module.exports = upload;
