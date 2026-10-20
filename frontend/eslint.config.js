@@ -25,6 +25,12 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/context/ThemeContext.jsx'],
+    rules: {
+      'react-refresh/only-export-components': ['error', { allowExportNames: ['ThemeContext'] }],
+    },
+  },
+  {
     files: ['vite.config.js'],
     languageOptions: {
       globals: globals.node,
