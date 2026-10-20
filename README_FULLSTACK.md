@@ -1,28 +1,60 @@
-# CampusGPT Full-stack Setup
+# CampusGPT — Full-Stack Integration
 
-The repository is split into three services: the existing FastAPI RAG/AI layer (`ai-services/`), a new Node.js/Express web backend (`backend/`), and a React + TypeScript frontend (`frontend/`). The API routes and request/response models of the existing FastAPI service remain unchanged.
+CampusGPT runs as three services:
 
-## What this adds
+- **Frontend:** React + Vite, normally on port 3000 for development or 5173 in Docker.
+- **Web backend:** Node.js + Express + MongoDB, on port 4000.
+- **AI service:** FastAPI + Ollama embeddings + persistent ChromaDB, with answer generation through the Gemini-compatible Web API gateway.
 
-- Registration/login/logout with password hashing and an HTTP-only session cookie.
-- PostgreSQL-backed users, conversations, document metadata, and document sharing in a separate `campus_app` schema.
-- Server-side document authorization and proxying to the existing `/v1/chat` service.
-- Upload/index/reindex/download/delete document endpoints and an admin/staff UI.
-- OCR fallback for scanned PDF pages using Tesseract + `pytesseract`.
-- Dockerfiles and a repository-root Docker Compose configuration.
+The browser communicates only with the Express backend. The backend authenticates users, computes which documents their role may access, calls the AI service, and saves conversations. The browser never supplies the AI service's authorized-document allow-list.
 
-## Local development (Windows PowerShell)
+## End-to-end chat flow
 
-### 1. AI service
+1. A student, teacher, or administrator signs in through the web backend.
+2. The frontend creates/loads a chat session and submits a message to `/api/v1/chat/sessions/:id/messages`.
+3. Express verifies the user/session, finds documents visible to that role, and calls `POST /v1/chat` on the AI service with only those AI document IDs.
+4. FastAPI applies its intent and metadata retrieval, uses local Ollama embeddings and ChromaDB, and sends only answer-generation context to the configured Gemini Web API gateway.
+5. Express validates returned sources against the authorized MongoDB document set, saves the response and source metadata, and returns the chat result.
+6. The student/teacher chat UI renders the answer and its source titles/page numbers.
 
-From `ai-services/`, configure its `.env` with the existing Supabase + Voyage settings and ensure the Gemini-compatible gateway is reachable.
+Document uploads from admin/teacher pages are stored in the shared file directory and indexed by FastAPI. Editing document metadata triggers re-indexing; deletion removes its AI vectors before the source metadata/file is removed.
+
+## Local development — Windows PowerShell
+
+### Prerequisites
+
+Install Node.js 22, Python 3.11, MongoDB, Ollama, and start your Gemini Web API gateway. The gateway must accept OpenAI-compatible requests at `/v1/chat/completions`; by default it is expected at `http://127.0.0.1:8081/v1`.
+
+### 1. Start MongoDB, Ollama, and the Gemini gateway
+
+Start the MongoDB service. For local embeddings:
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
-python -m uvicorn app.main:app --reload
+ollama pull nomic-embed-text:latest
+ollama list
 ```
 
-### 2. Backend
+Keep the Gemini Web API gateway running in its own terminal. If its URL or exposed model differs, update `GEMINI_BASE_URL` and `GEMINI_MODEL` in `ai-services/.env`.
+
+### 2. Start the AI service
+
+```powershell
+cd ai-services
+Copy-Item .env.example .env
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python scripts/check_local_setup.py
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+If `ai-services/.env` already exists, keep it and check that the active values use Ollama + Chroma and your Gemini gateway URL.
+
+AI health: `http://127.0.0.1:8000/health`. Swagger: `http://127.0.0.1:8000/docs`.
+
+### 3. Configure and start the backend
+
+Open a second terminal:
 
 ```powershell
 cd backend
@@ -30,51 +62,131 @@ Copy-Item .env.example .env
 npm install
 ```
 
-Set `DATABASE_URL`, `JWT_SECRET` (at least 32 random characters), `AI_SERVICE_URL=http://127.0.0.1:8000`, and `SHARED_DOCUMENTS_DIR` in `backend/.env`. If running processes separately, use a file directory both processes can access. Apply the app-only schema and register existing vector documents:
+Set `MONGO_URI`, `JWT_SECRET` (a new random value with at least 32 characters), `AI_SERVICE_URL=http://127.0.0.1:8000`, and `SHARED_DOCUMENTS_DIR=./uploads` in `backend/.env`. Keep the directory shared between your backend and AI service processes by running them on the same Windows machine. Never commit either service's real `.env`.
+
+You can generate a JWT secret with:
 
 ```powershell
-npm run migrate
-npm run seed:existing-documents
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+Run static checks and tests:
+
+```powershell
+npm run check
+npm test
+```
+
+Create the initial administrator once. In the same PowerShell terminal, set private values for the current shell:
+
+```powershell
+$env:BOOTSTRAP_ADMIN_EMAIL = "admin@your-college.edu"
+$env:BOOTSTRAP_ADMIN_PASSWORD = "replace-with-a-unique-password-of-12-or-more-characters"
 npm run bootstrap:admin
+```
+
+After the admin exists, register and index the bundled starter documents:
+
+```powershell
+npm run seed:documents
 npm run dev
 ```
 
-Configure `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` before running the admin bootstrap command. Seed refuses an empty vector collection. Existing PDFs indexed earlier are metadata-registered; the seed operation does not re-embed their vectors.
+The seed command is idempotent. It registers the sample PDFs under stable AI document IDs and indexes/re-indexes them through the AI service. It requires an active admin account and files under `ai-services/data/`. Run the command again to reindex those sample PDFs after deleting/recreating the local Chroma collection.
 
-Health: `http://localhost:4000/api/health`
+Backend health: `http://127.0.0.1:4000/api/health`.
 
-### 3. Frontend
+### 4. Start the frontend
 
-Open a second terminal:
+In a third terminal:
 
 ```powershell
 cd frontend
 npm install
+npm run lint
+npm run build
 npm run dev
 ```
 
-Open `http://localhost:5173`. Vite proxies `/api` requests to the web backend.
+Open `http://localhost:3000`. Vite proxies `/api` requests to `http://127.0.0.1:4000`; the browser does not need a direct connection to the AI service.
 
-## Docker Compose
+## Docker Compose — integrated local profile
 
-At repository root, copy `.env.fullstack.example` to `.env.fullstack` and configure real connection strings, Voyage key, and a newly generated JWT secret. Never commit `.env.fullstack` or any real credentials.
+This Compose profile includes MongoDB, Ollama, ChromaDB, FastAPI, Express, and the frontend. The Gemini Web API gateway remains a separate process and must be accessible from Docker Desktop at `http://host.docker.internal:8081/v1`.
+
+1. At the repository root, copy the example environment file and set a new JWT secret:
 
 ```powershell
-docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml up --build
+Copy-Item .env.fullstack.example .env.fullstack
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+# Put the generated value into JWT_SECRET in .env.fullstack.
 ```
 
-Web UI: `http://localhost:5173`; backend health: `http://localhost:4000/api/health`. The integrated stack mounts a shared documents volume into the Node backend and the AI service so `file_path` remains accessible without changing the ingestion API schema.
+2. Start the stack:
 
-After vectors exist, run the existing-document seed and admin bootstrap commands inside the backend container as described in `backend/README.md`.
+```powershell
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml up --build -d
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml ps
+```
 
-## Security and architecture notes
+Ollama downloads `nomic-embed-text:latest` during first startup. The sample PDFs are mounted read-only into both the backend and AI containers; uploads use a separate shared writable volume. Chroma and MongoDB persist in named volumes.
 
-- Do not expose the `campusgpt` vector schema through Supabase Data API schemas; the services connect server-side using PostgreSQL.
-- The server calculates authorized document IDs. The browser is not allowed to submit the AI-service allow-list itself.
-- An empty access list means no additional retrieval restriction in the existing AI service. The backend must therefore return a safe empty-document answer when a user has no authorized documents, not pass an empty list expecting it to deny all records.
-- Seeded pre-existing documents have no local downloadable file path through the web app unless separately uploaded.
-- Existing production `public` tables are left untouched by the `campus_app` migration.
+3. Bootstrap an administrator. Choose a unique email and strong password; do not commit them to `.env.fullstack`:
 
-## Tests and production readiness
+```powershell
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml exec -e BOOTSTRAP_ADMIN_EMAIL=admin@your-college.edu -e BOOTSTRAP_ADMIN_PASSWORD=replace-with-a-unique-password backend npm run bootstrap:admin
+```
 
-Run `npm test` in `backend/`; run `python -m pytest -v` in `ai-services/`. A full browser build and live deployment should be run after credentials and external gateway connectivity are configured. Before production, configure HTTPS, backups, observability, rate limiting, password-reset/email verification, rollback, and secret rotation. Inspect OCR-recognized details such as dates and names against original scans.
+4. Register/index bundled sample documents:
+
+```powershell
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml exec -e BOOTSTRAP_ADMIN_EMAIL=admin@your-college.edu backend npm run seed:documents
+```
+
+The commands are safe to rerun: bootstrap stops if the account already exists and the document seed upserts sample metadata and re-indexes each document.
+
+Open the UI at `http://localhost:5173`. Check health at `http://localhost:4000/api/health` and `http://localhost:5173/api/health`. The AI service is private to the Compose network.
+
+Common commands:
+
+```powershell
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml logs -f backend ai-service
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml down
+```
+
+`down` preserves named volumes. Do not use `down -v` unless you explicitly intend to delete MongoDB, Chroma, Ollama model data, and uploaded documents.
+
+## Environment settings
+
+- `backend/.env`: `MONGO_URI`, `JWT_SECRET`, `AI_SERVICE_URL`, `SHARED_DOCUMENTS_DIR`, CORS origins, and optional SMTP credentials.
+- `ai-services/.env`: `GEMINI_BASE_URL`, `GEMINI_MODEL`, `EMBEDDING_PROVIDER=ollama`, `OLLAMA_BASE_URL`, `VECTOR_STORE_BACKEND=chroma`, and Chroma persistence settings.
+- `.env.fullstack`: Compose-level JWT secret and Gemini model/gateway settings.
+
+Document upload/indexing currently supports **PDF and DOCX**, matching the AI service loaders. Each upload must have a department, document type, and required metadata accepted by the backend schema.
+
+## Verification checklist
+
+Run the following locally before considering the branch ready:
+
+```powershell
+# backend/
+npm run check
+npm test
+
+# frontend/
+npm run lint
+npm run build
+
+# ai-services/
+python -m pytest -v
+python scripts/check_local_setup.py
+```
+
+Then perform a live smoke test: sign in as an administrator, teacher, and student; submit a campus question in both student and teacher chat; verify a grounded answer shows sources; verify a student cannot retrieve a `TEACHER_ONLY` document; upload a PDF/DOCX as a teacher/admin; ask a question covered by that document; then update and delete it and confirm retrieval follows those changes.
+
+## Security and operational notes
+
+- The backend computes the document allow-list on every chat request and validates returned source IDs before saving them.
+- When no documents are authorized, the backend explicitly asks FastAPI to deny document retrieval; it does not rely on an empty allow-list to deny access.
+- Do not expose the AI service, MongoDB, or Ollama ports directly to untrusted networks. Use HTTPS, strong production database authentication, rate limiting, backup/restore drills, centralized logs, monitoring, and secret rotation before public deployment.
+- The Compose profile is for local/integration use. A public production deployment needs hardened MongoDB authentication, TLS, restrictive CORS, and an appropriate private Gemini gateway endpoint.
