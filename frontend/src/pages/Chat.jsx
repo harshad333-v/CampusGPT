@@ -11,8 +11,6 @@ import {
 
 import StudentSidebar from "../components/StudentSidebar";
 
-import ChatWelcome from "../components/chat/ChatWelcome";
-
 import ChatInput from "../components/chat/ChatInput";
 
 import ChatMessages from "../components/chat/ChatMessages";
