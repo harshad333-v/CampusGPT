@@ -1,19 +1,20 @@
 # CampusGPT
 
-CampusGPT is a university information assistant built around a FastAPI RAG service, a Node.js/Express web backend, and a React frontend.
+CampusGPT is a university information assistant composed of a React frontend, Node.js/Express web backend, and FastAPI retrieval-augmented generation (RAG) service.
 
-## Components
+## Services
 
-- [`ai-services/`](ai-services/README.md) — existing FastAPI AI service, NLP/routing, document ingestion, retrieval, grounded generation, and existing API contracts.
-- [`backend/`](backend/README.md) — Node.js/Express web API, authentication, document access control, conversations, and server-side AI-service integration.
-- [`frontend/`](frontend/README.md) — React + TypeScript client.
-- [`README_FULLSTACK.md`](README_FULLSTACK.md) — integration guide, local setup, Docker Compose, environment configuration, and known production tasks.
-- [`ai-services/DEPLOYMENT.md`](ai-services/DEPLOYMENT.md) — AI service deployment settings and Supabase/Voyage configuration.
+- [Frontend](frontend/) — React + Vite student, teacher, and administrator interfaces.
+- [Backend](backend/) — authentication, role-aware document access, chat sessions, uploads, and the server-to-server AI integration.
+- [AI service](ai-services/README.md) — FastAPI, NLP/routing, document parsing and indexing, Ollama embeddings, persistent ChromaDB, and Gemini Web API answer generation.
+- [Full-stack setup and integration guide](README_FULLSTACK.md) — local startup, Docker Compose, environment configuration, administrator bootstrap, sample document seeding, and end-to-end verification.
 
-## API contracts preserved
+## Request flow
 
-The existing AI service endpoints remain `GET /health`, `POST /v1/chat`, `POST /v1/documents/ingest`, and `DELETE /v1/documents/{document_id}`. The web backend proxies chat requests and calculates allowed document IDs server-side; the frontend never receives database credentials or AI-provider keys.
+The browser calls only the Express backend via `/api/v1`. The backend authenticates the user and computes the allowed document IDs based on current role and document visibility. FastAPI retrieves only from that allow-list, uses local Ollama embeddings with ChromaDB, and sends the grounded context to the configured Gemini-compatible gateway. The backend persists the answer and validated source citations for the frontend.
 
 ## Quick start
 
-See [`README_FULLSTACK.md`](README_FULLSTACK.md) for full prerequisites, environment setup, migrations, initial administrator bootstrap, existing-document registration, and separate-process or Docker Compose launch instructions. Never commit real `.env` files or secrets.
+See [README_FULLSTACK.md](README_FULLSTACK.md) for the prerequisites and exact commands to run all three services locally or with Docker Compose.
+
+Never commit real `.env` files, JWT secrets, database credentials, API keys, or private document corpora.
