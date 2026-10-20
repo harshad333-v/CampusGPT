@@ -403,7 +403,7 @@ function Chat() {
         return;
       }
 
-      const updatedMessages = await getChatMessages(selectedSession._id);
+      const updatedMessages = await getChatMessages(currentSession._id);
 
       if (updatedMessages.success) {
         setMessages(updatedMessages.data || []);
