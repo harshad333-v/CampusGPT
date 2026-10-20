@@ -108,6 +108,19 @@ const documentSchema = new mongoose.Schema(
       required: true,
     },
 
+    // ID used by the AI vector index; may be a legacy/stable non-ObjectId for seeded records.
+    aiDocumentId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+
+    // Seeded files are mounted read-only from ai-services/data and must never be unlinked.
+    isSeeded: {
+      type: Boolean,
+      default: false,
+    },
+
     isActive: {
       type: Boolean,
       default: true,
