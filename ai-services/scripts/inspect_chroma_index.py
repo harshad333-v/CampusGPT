@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
+from pathlib import Path
 import re
 import sys
 from typing import Any
 
-AI_ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
+AI_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(AI_ROOT))
 
 from app.core.config import get_settings
@@ -63,21 +64,25 @@ def main() -> int:
     )
     match_term = args.match.casefold() if args.match else None
 
-    for vector_id, metadata, document_text in zip(ids, metadatas, documents):
+    for metadata, document_text in zip(metadatas, documents):
         metadata = metadata or {}
         document_text = document_text or ""
         document_id = str(metadata.get("document_id") or "(missing document_id)")
         title = str(metadata.get("title") or "(untitled)")
-        filename = str(metadata.get("file_name") or metadata.get("source") or "(unknown file)")
-        searchable = " ".join([document_id, title, filename, document_text]).casefold()
+        filename = str(
+            metadata.get("file_name") or metadata.get("source") or "(unknown file)"
+        )
+        searchable = " ".join(
+            [document_id, title, filename, document_text]
+        ).casefold()
 
         normalized = normalize_text(document_text)
         if normalized:
-            fingerprint = normalized
-            exact_chunks[fingerprint]["document_ids"].add(document_id)
-            exact_chunks[fingerprint]["count"] += 1
-            if not exact_chunks[fingerprint]["snippet"]:
-                exact_chunks[fingerprint]["snippet"] = re.sub(r"\s+", " ", document_text).strip()[:180]
+            details = exact_chunks[normalized]
+            details["document_ids"].add(document_id)
+            details["count"] += 1
+            if not details["snippet"]:
+                details["snippet"] = re.sub(r"\s+", " ", document_text).strip()[:180]
 
         if match_term and match_term not in searchable:
             continue
@@ -88,16 +93,16 @@ def main() -> int:
                 "count": 0,
                 "titles": set(),
                 "filenames": set(),
-                "ids": [],
                 "snippets": [],
             },
         )
         entry["count"] += 1
         entry["titles"].add(title)
         entry["filenames"].add(filename)
-        entry["ids"].append(str(vector_id))
         if document_text.strip() and len(entry["snippets"]) < 2:
-            entry["snippets"].append(re.sub(r"\s+", " ", document_text).strip()[:180])
+            entry["snippets"].append(
+                re.sub(r"\s+", " ", document_text).strip()[:180]
+            )
 
     print(f"Chroma collection: {settings.chroma_collection_name}")
     print(f"Persist directory: {settings.chroma_persist_directory}")
@@ -128,9 +133,14 @@ def main() -> int:
     if not duplicates:
         print("  None found.")
     else:
-        for _, details in sorted(duplicates, key=lambda item: (-len(item[1]["document_ids"]), item[0])):
+        for _, details in sorted(
+            duplicates,
+            key=lambda item: (-len(item[1]["document_ids"]), item[0]),
+        ):
             ids_text = ", ".join(sorted(details["document_ids"]))
-            print(f"  - document IDs: {ids_text}; occurrences: {details['count']}")
+            print(
+                f"  - document IDs: {ids_text}; occurrences: {details['count']}"
+            )
             if args.show_snippets:
                 print(f"    snippet: {details['snippet']}")
 
