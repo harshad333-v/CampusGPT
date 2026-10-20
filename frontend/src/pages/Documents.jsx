@@ -57,12 +57,15 @@ function Documents() {
         throw new Error(message);
       }
 
-      const objectUrl = window.URL.createObjectURL(await response.blob());
-      const openedWindow = window.open(objectUrl, "_blank", "noopener,noreferrer");
+      // Open the tab synchronously during the click gesture before awaiting the network.
+      const openedWindow = window.open("about:blank", "_blank");
       if (!openedWindow) {
-        window.URL.revokeObjectURL(objectUrl);
         throw new Error("The browser blocked the document tab. Allow pop-ups and try again.");
       }
+      openedWindow.opener = null;
+
+      const objectUrl = window.URL.createObjectURL(await response.blob());
+      openedWindow.location.href = objectUrl;
       window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 60000);
     } catch (err) {
       console.error("Open document error:", err);
