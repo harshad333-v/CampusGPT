@@ -90,7 +90,9 @@ const MANIFEST = [
 ];
 
 async function getOrCreateDepartment(entry) {
-  const existing = await Department.findOne({ code: entry.departmentCode });
+  const existing = await Department.findOne({
+    $or: [{ code: entry.departmentCode }, { name: entry.departmentName }],
+  });
   if (existing) return existing;
 
   return Department.create({
