@@ -15,12 +15,12 @@ function getAIServiceUrl() {
   return (process.env.AI_SERVICE_URL || DEFAULT_AI_SERVICE_URL).replace(/\/+$/, "");
 }
 
-async function requestAI(path, { method = "POST", body, timeoutMs } = {}) {
+async function requestAI(path, { method = "POST", body, timeoutMs, headers: extraHeaders = {} } = {}) {
   const timeout = Number(timeoutMs || process.env.AI_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), timeout);
 
-  const headers = {};
+  const headers = { ...extraHeaders };
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
@@ -79,8 +79,13 @@ async function requestAI(path, { method = "POST", body, timeoutMs } = {}) {
   }
 }
 
-async function generateChatResponse(payload) {
-  return requestAI("/v1/chat", { body: payload });
+async function generateChatResponse(payload, { denyDocumentRetrieval = false } = {}) {
+  return requestAI("/v1/chat", {
+    body: payload,
+    headers: denyDocumentRetrieval
+      ? { "X-CampusGPT-Deny-Document-Retrieval": "true" }
+      : {},
+  });
 }
 
 async function indexDocument(payload) {
