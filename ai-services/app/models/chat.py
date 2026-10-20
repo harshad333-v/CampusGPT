@@ -19,7 +19,6 @@ class ChatRequest(BaseModel):
     conversation: list[ConversationMessage] = Field(default_factory=list)
     user_context: UserContext | None = None
     accessible_document_ids: list[str] = Field(default_factory=list)
-    deny_document_retrieval: bool = False
 
 
 class Source(BaseModel):
