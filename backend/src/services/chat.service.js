@@ -34,25 +34,30 @@ function toAIConversation(messages) {
     .filter((entry) => entry.content && entry.content.trim());
 }
 
-function toStoredSources(sources, accessibleIds) {
-  if (!Array.isArray(sources)) {
-    return [];
-  }
+function toStoredSources(sources, accessibleDocuments) {
+  if (!Array.isArray(sources)) return [];
 
-  const allowed = new Set(accessibleIds);
-  const seen = new Set();
+  const allowedByAIId = new Map(
+    accessibleDocuments.map((document) => [
+      String(document.aiDocumentId || document._id),
+      document,
+    ]),
+  );
+  const seenDatabaseIds = new Set();
   const safeSources = [];
 
   for (const source of sources) {
-    const documentId = String(source?.document_id || "");
-    if (!documentId || !allowed.has(documentId) || seen.has(documentId)) {
-      continue;
-    }
+    const aiDocumentId = String(source?.document_id || "");
+    const document = allowedByAIId.get(aiDocumentId);
+    if (!document) continue;
 
-    seen.add(documentId);
+    const databaseId = String(document._id);
+    if (seenDatabaseIds.has(databaseId)) continue;
+    seenDatabaseIds.add(databaseId);
+
     safeSources.push({
-      documentId,
-      title: String(source.title || "College document"),
+      documentId: databaseId,
+      title: String(source.title || document.title || "College document"),
       page: Number.isInteger(source.page) && source.page > 0 ? source.page : undefined,
     });
   }
@@ -155,9 +160,11 @@ async function sendMessageService({ sessionId, userId, message }) {
   }
 
   const allowedDocuments = await Document.find(getVisibleDocumentFilter(user))
-    .select("_id")
+    .select("_id aiDocumentId title")
     .lean();
-  const accessibleDocumentIds = allowedDocuments.map((document) => String(document._id));
+  const accessibleDocumentIds = allowedDocuments.map(
+    (document) => String(document.aiDocumentId || document._id),
+  );
 
   // The AI API historically treats an empty allow-list as unrestricted. This
   // explicit flag prevents an empty backend authorization result from exposing
@@ -186,7 +193,7 @@ async function sendMessageService({ sessionId, userId, message }) {
     throw error;
   }
 
-  const safeSources = toStoredSources(aiResponse.sources, accessibleDocumentIds);
+  const safeSources = toStoredSources(aiResponse.sources, allowedDocuments);
 
   // Save the user and assistant turns only after the model response has been
   // received, so upstream failures don't leave a misleading partial exchange.
