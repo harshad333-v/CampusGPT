@@ -43,7 +43,7 @@ async function indexStoredDocument(documentId) {
   if (!document) throw new Error("Document not found for AI indexing");
 
   return indexDocument({
-    document_id: String(document._id),
+    document_id: String(document.aiDocumentId || document._id),
     title: document.title,
     file_path: document.filePath,
     document_type: inferAIDocumentType(document),
@@ -146,8 +146,8 @@ async function deleteDocumentService(id) {
 
   // Fail closed: if AI indexing cannot be reached, keep the metadata and file
   // so the vector index cannot silently drift away from the source of truth.
-  await deleteIndexedDocument(String(document._id));
-  if (document.filePath) {
+  await deleteIndexedDocument(String(document.aiDocumentId || document._id));
+  if (!document.isSeeded && document.filePath) {
     await fs.promises.rm(document.filePath, { force: true });
   }
   await Document.findByIdAndDelete(id);
