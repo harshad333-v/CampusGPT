@@ -289,13 +289,7 @@ function TeacherDocuments() {
       return;
     }
 
-    const allowedExtensions = [
-      ".pdf",
-      ".doc",
-      ".docx",
-      ".ppt",
-      ".pptx",
-    ];
+    const allowedExtensions = [".pdf", ".docx"];
 
     const fileName = file.name.toLowerCase();
 
@@ -306,7 +300,7 @@ function TeacherDocuments() {
     if (!isAllowed) {
       setSelectedFile(null);
       setError(
-        "Only PDF, DOC, DOCX, PPT and PPTX files are allowed."
+        "Only PDF and DOCX files are supported for AI indexing."
       );
 
       event.target.value = "";
@@ -1204,14 +1198,14 @@ function TeacherDocuments() {
 
                 <input
                   type="file"
-                  accept=".pdf,.doc,.docx,.ppt,.pptx"
+                  accept=".pdf,.docx"
                   onChange={handleFileChange}
                   className="block w-full cursor-pointer rounded-xl border border-slate-200 bg-white text-sm text-slate-600 file:mr-4 file:border-0 file:bg-slate-50 file:px-4 file:py-3 file:text-sm file:font-semibold dark:border-white/[0.08] dark:bg-[#11151d] dark:text-slate-300 dark:file:bg-white/[0.06] dark:file:text-white"
                   required
                 />
 
                 <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  PDF, DOC, DOCX, PPT or PPTX. Maximum
+                  PDF or DOCX. Maximum
                   size: 20 MB.
                 </p>
 
