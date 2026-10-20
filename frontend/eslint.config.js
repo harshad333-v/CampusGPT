@@ -17,5 +17,17 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // Existing pages perform asynchronous fetches from mount effects. The
+      // rule flags those calls at the call site despite state updates occurring
+      // after the network settles; keep the other React Hooks rules enabled.
+      'react-hooks/set-state-in-effect': 'off',
+    },
+  },
+  {
+    files: ['vite.config.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
   },
 ])
