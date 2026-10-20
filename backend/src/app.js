@@ -20,7 +20,9 @@ app.use(
       if (!origin || allowedOrigins.has(origin)) {
         return callback(null, true);
       }
-      return callback(new Error("Origin not allowed by CORS"));
+      const error = new Error("Origin not allowed by CORS");
+      error.statusCode = 403;
+      return callback(error);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -73,7 +75,7 @@ app.use((req, res) => {
 
 // Multer and CORS failures are returned as JSON rather than Express HTML pages.
 app.use((error, _req, res, _next) => {
-  const status = error.statusCode || (error.name === "MulterError" ? 400 : 500);
+  const status = error.statusCode || error.status || (error.name === "MulterError" ? 400 : 500);
   res.status(status).json({
     success: false,
     message: status >= 500 ? "The request could not be completed." : error.message,
