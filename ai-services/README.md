@@ -99,6 +99,7 @@ The request and response models for these routes remain unchanged. POST /v1/chat
 - scripts/setup_local.ps1 — create the virtual environment and install Python dependencies.
 - scripts/check_local_setup.py — check local-mode settings, Ollama reachability/model availability, embedding generation, Chroma storage, and Gemini gateway reachability.
 - scripts/ingest_directory.py — recursively ingest .pdf and .docx files. It maintains stable local document IDs, updates changed chunks, and removes stale chunks for the same imported document.
+- scripts/inspect_chroma_index.py — read-only inventory of indexed document IDs and exact chunk text repeated across IDs. It never deletes or modifies vectors.
 
 Preview an import without changing the vector database:
 
@@ -119,6 +120,15 @@ python scripts/ingest_directory.py --directory data --department CSE --semester 
 ~~~
 
 Do not set a global --document-type for a folder containing mixed timetables, notices, and syllabi; let filename rules infer types or import folders by document category.
+
+Inspect the current local index before considering any cleanup:
+
+~~~powershell
+python scripts/inspect_chroma_index.py
+python scripts/inspect_chroma_index.py --match "Raksha Bandhan" --show-snippets
+~~~
+
+The audit is read-only. It reports exact-text chunks found under multiple document IDs, but overlapping content is not proof that one document is obsolete. Review the IDs, titles, filenames, and source documents before using the existing document-delete endpoint; never clear the entire collection to fix a duplicate-source issue.
 
 ## Useful troubleshooting
 
