@@ -40,7 +40,7 @@ Keep the Gemini Web API gateway running in its own terminal. If its URL or expos
 
 ```powershell
 cd ai-services
-Copy-Item .env.example .env
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
@@ -58,7 +58,7 @@ Open a second terminal:
 
 ```powershell
 cd backend
-Copy-Item .env.example .env
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
 npm install
 ```
 
@@ -89,6 +89,7 @@ After the admin exists, register and index the bundled starter documents:
 
 ```powershell
 npm run seed:documents
+Remove-Item Env:BOOTSTRAP_ADMIN_PASSWORD -ErrorAction SilentlyContinue
 npm run dev
 ```
 
