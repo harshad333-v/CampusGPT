@@ -5,6 +5,7 @@ const { test } = require("node:test");
 const {
   AIServiceError,
   requestAI,
+  generateChatResponse,
 } = require("../src/services/aiClient.service");
 const {
   getVisibleDocumentFilter,
@@ -13,7 +14,7 @@ const {
 
 test("AI client and authorization helpers", async (t) => {
   const server = http.createServer((req, res) => {
-    if (req.url === "/ok") {
+    if (req.url === "/ok" || req.url === "/v1/chat") {
       let body = "";
       req.on("data", (chunk) => { body += chunk; });
       req.on("end", () => {
@@ -22,6 +23,7 @@ test("AI client and authorization helpers", async (t) => {
           ok: true,
           method: req.method,
           payload: body ? JSON.parse(body) : null,
+          denyRetrieval: req.headers["x-campusgpt-deny-document-retrieval"] || null,
         }));
       });
       return;
@@ -61,6 +63,18 @@ test("AI client and authorization helpers", async (t) => {
       assert.equal(result.ok, true);
       assert.equal(result.method, "POST");
       assert.deepEqual(result.payload, { message: "hello" });
+    });
+
+    await t.test("sends no-access guard only through the private service header", async () => {
+      const result = await generateChatResponse(
+        { message: "hello", accessible_document_ids: [] },
+        { denyDocumentRetrieval: true },
+      );
+      assert.equal(result.denyRetrieval, "true");
+      assert.deepEqual(result.payload, {
+        message: "hello",
+        accessible_document_ids: [],
+      });
     });
 
     await t.test("maps upstream failures to a gateway error", async () => {
