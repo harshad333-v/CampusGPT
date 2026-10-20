@@ -130,6 +130,24 @@ function ChatMessages({
                       {message.message}
                     </p>
                   )}
+                  {!isUser && !isEditing && Array.isArray(message.sources) && message.sources.length > 0 && (
+                    <div className="mt-4 border-t border-slate-200 pt-3 dark:border-white/[0.08]">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Sources
+                      </p>
+                      <ul className="space-y-1">
+                        {message.sources.map((source, index) => (
+                          <li
+                            key={`${source.documentId || source.document_id || source.title}-${source.page || index}`}
+                            className="text-xs text-slate-600 dark:text-slate-300"
+                          >
+                            <span className="font-medium">{source.title || "College document"}</span>
+                            {source.page ? <span className="text-slate-400"> · page {source.page}</span> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
                 {/* MESSAGE ACTIONS */}
