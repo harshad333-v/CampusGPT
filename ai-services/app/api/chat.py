@@ -21,6 +21,7 @@ def chat(request: ChatRequest) -> ChatResponse:
         query=request.message,
         accessible_document_ids=request.accessible_document_ids,
         conversation=request.conversation,
+        deny_document_retrieval=request.deny_document_retrieval,
     )
 
     # ---------------------------------------------------------------
