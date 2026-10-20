@@ -7,7 +7,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "node --test",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/services/aiClient.service.js && node --check src/services/chat.service.js && node --check src/services/document.service.js"
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/services/aiClient.service.js && node --check src/services/chat.service.js && node --check src/services/document.service.js",
+    "bootstrap:admin": "node scripts/bootstrapAdmin.js"
   },
   "keywords": [],
   "author": "",
