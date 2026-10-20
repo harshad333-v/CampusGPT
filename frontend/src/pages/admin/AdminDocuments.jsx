@@ -474,13 +474,7 @@ function AdminDocuments() {
       return;
     }
 
-    const allowedExtensions = [
-      "pdf",
-      "doc",
-      "docx",
-      "ppt",
-      "pptx",
-    ];
+    const allowedExtensions = ["pdf", "docx"];
 
     const extension = file.name
       .split(".")
@@ -489,7 +483,7 @@ function AdminDocuments() {
 
     if (!allowedExtensions.includes(extension)) {
       setError(
-        "Invalid file type. Only PDF, DOC, DOCX, PPT and PPTX files are allowed."
+        "Invalid file type. Only PDF and DOCX files are supported for AI indexing."
       );
       event.target.value = "";
       setSelectedFile(null);
@@ -1523,7 +1517,7 @@ function AdminDocuments() {
                     <input
                       id="document-file"
                       type="file"
-                      accept=".pdf,.doc,.docx,.ppt,.pptx"
+                      accept=".pdf,.docx"
                       onChange={handleFileChange}
                       className="hidden"
                     />
@@ -1543,7 +1537,7 @@ function AdminDocuments() {
                       </p>
 
                       <p className="mt-1 text-xs text-slate-500">
-                        PDF, DOC, DOCX, PPT or PPTX · Max 20 MB
+                        PDF or DOCX · Max 20 MB
                       </p>
                     </label>
                   </div>
