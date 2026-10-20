@@ -7,38 +7,28 @@ const chatMessageSchema = new mongoose.Schema(
       ref: "ChatSession",
       required: true,
     },
-
     role: {
       type: String,
       enum: ["user", "assistant"],
       required: true,
     },
-
     message: {
       type: String,
       required: true,
       trim: true,
     },
-
     sources: [
       {
         documentId: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "Document",
         },
-
-        title: {
-          type: String,
-        },
+        title: { type: String },
+        page: { type: Number },
       },
     ],
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true },
 );
 
-module.exports = mongoose.model(
-  "ChatMessage",
-  chatMessageSchema
-);
+module.exports = mongoose.model("ChatMessage", chatMessageSchema);
