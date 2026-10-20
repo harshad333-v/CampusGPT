@@ -109,13 +109,15 @@ test("AI client and authorization helpers", async (t) => {
 
     await t.test("only authorized, unique sources are stored", () => {
       const sources = toStoredSources([
-        { document_id: "doc-a", title: "Allowed A", page: 2 },
-        { document_id: "doc-a", title: "Duplicate", page: 3 },
-        { document_id: "doc-b", title: "Not allowed", page: 1 },
-      ], ["doc-a"]);
+        { document_id: "ai-a", title: "Allowed A", page: 2 },
+        { document_id: "ai-a", title: "Duplicate", page: 3 },
+        { document_id: "ai-b", title: "Not allowed", page: 1 },
+      ], [
+        { _id: "mongo-a", aiDocumentId: "ai-a", title: "Document A" },
+      ]);
 
       assert.deepEqual(sources, [
-        { documentId: "doc-a", title: "Allowed A", page: 2 },
+        { documentId: "mongo-a", title: "Allowed A", page: 2 },
       ]);
     });
   } finally {
