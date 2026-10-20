@@ -1,49 +1,58 @@
-import express from "express";
-import helmet from "helmet";
-import cors from "cors";
-import cookieParser from "cookie-parser";
-import { config } from "./config.js";
-import { pool } from "./db/pool.js";
-import { asyncHandler } from "./errors.js";
-import { requestId } from "./middleware/request-id.js";
-import { errorHandler, notFound } from "./middleware/error-handler.js";
-import { requireAuth } from "./middleware/auth.js";
-import authRouter from "./routes/auth.js";
-import documentsRouter from "./routes/documents.js";
-import conversationsRouter from "./routes/conversations.js";
-import chatRouter from "./routes/chat.js";
-import usersRouter from "./routes/users.js";
-import { isCampusAIHealthy } from "./services/ai-client.js";
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
 
 const app = express();
-app.disable("x-powered-by");
-app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
-app.use(requestId);
-app.use(helmet({ crossOriginResourcePolicy: { policy: "same-site" }, contentSecurityPolicy: false }));
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || config.clientOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error("Origin is not allowed by CORS."));
-  },
-  credentials: true
-}));
-app.use(express.json({ limit: "1mb" }));
-app.use(cookieParser());
 
-app.get("/api/health/live", (_req, res) => res.json({ status: "ok", service: "campusgpt-web-backend" }));
-app.get("/api/health", asyncHandler(async (_req, res) => {
-  await pool.query("SELECT 1");
-  const aiServiceHealthy = await isCampusAIHealthy();
-  res.status(200).json({ status: aiServiceHealthy ? "ok" : "degraded", database: "ok", ai_service: aiServiceHealthy ? "ok" : "unavailable" });
-}));
+// Enable CORS
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-app.use("/api/auth", authRouter);
-app.use("/api/documents", documentsRouter);
-app.use("/api/conversations", conversationsRouter);
-app.use("/api/chat", chatRouter);
-app.use("/api/users", usersRouter);
-app.get("/api/account", requireAuth, (req, res) => res.json({ user: req.user }));
-app.use(notFound);
-app.use(errorHandler);
+app.use(express.json());
 
-export default app;
+// Serve uploaded files
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Routes
+const authRoutes = require("./routes/auth.routes");
+const userRoutes = require("./routes/user.routes");
+const documentRoutes = require("./routes/document.routes");
+const notificationRoutes = require("./routes/notification.routes");
+const departmentRoutes = require("./routes/department.routes");
+const chatRoutes = require("./routes/chat.routes");
+const dashboardRoutes = require("./routes/dashboard.routes");
+const bulkRegistrationRoutes = require("./routes/bulkRegistration.routes");
+
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/documents", documentRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/departments", departmentRoutes);
+app.use("/api/v1/chat", chatRoutes);
+app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/users", bulkRegistrationRoutes);
+
+// Test route
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "CampusGPT Backend Running",
+  });
+});
+
+// Catch-all for unhandled routes
+app.use((req, res) => {
+  res.status(404).json({
+    message: `Route ${req.originalUrl} not found`,
+  });
+});
+
+module.exports = app;

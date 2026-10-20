@@ -1,5 +1,5 @@
-.env
 node_modules/
-npm-debug.log*
-coverage/
-.DS_Store
+.env
+
+# Uploaded documents
+src/uploads/*
