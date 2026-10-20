@@ -16,8 +16,6 @@ function Documents() {
 
         const response = await getDocuments();
 
-        console.log("Documents response:", response);
-
         if (!response.success) {
           setError(
             response.message || "Unable to load documents."
@@ -37,39 +35,39 @@ function Documents() {
     loadDocuments();
   }, []);
 
-  function getDocumentUrl(filePath) {
-    if (!filePath) {
-      return null;
+  async function handleOpenDocument(doc) {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_BASE_URL}/documents/download/${doc._id}`,
+        {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (!response.ok) {
+        let message = "Unable to open document.";
+        try {
+          const data = await response.json();
+          message = data.message || message;
+        } catch {
+          // The backend may return a non-JSON response for download errors.
+        }
+        throw new Error(message);
+      }
+
+      const objectUrl = window.URL.createObjectURL(await response.blob());
+      const openedWindow = window.open(objectUrl, "_blank", "noopener,noreferrer");
+      if (!openedWindow) {
+        window.URL.revokeObjectURL(objectUrl);
+        throw new Error("The browser blocked the document tab. Allow pop-ups and try again.");
+      }
+      window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 60000);
+    } catch (err) {
+      console.error("Open document error:", err);
+      alert(err.message || "Unable to open document.");
     }
-
-    let normalizedPath = filePath.replace(/\\/g, "/");
-
-    normalizedPath = normalizedPath.replace(
-      /^src\//,
-      ""
-    );
-
-    const serverUrl = API_BASE_URL.replace(
-      "/api/v1",
-      ""
-    );
-
-    return `${serverUrl}/${normalizedPath}`;
-  }
-
-  function handleOpenDocument(doc) {
-    const documentUrl = getDocumentUrl(doc.filePath);
-
-    if (!documentUrl) {
-      alert("Document file is not available.");
-      return;
-    }
-
-    window.open(
-      documentUrl,
-      "_blank",
-      "noopener,noreferrer"
-    );
   }
 
   async function handleDownloadDocument(doc) {
