@@ -9,7 +9,7 @@ const {
 } = require("./aiClient.service");
 
 function canAccessDocument(user, document) {
-  if (!user || !document) return false;
+  if (!user || !document || document.isActive === false) return false;
   if (user.role === "admin") return true;
   if (document.visibility === "PUBLIC") return true;
   return document.visibility === "TEACHER_ONLY" && user.role === "teacher";
