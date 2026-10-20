@@ -100,6 +100,7 @@ The request and response models for these routes remain unchanged. POST /v1/chat
 - scripts/check_local_setup.py — check local-mode settings, Ollama reachability/model availability, embedding generation, Chroma storage, and Gemini gateway reachability.
 - scripts/ingest_directory.py — recursively ingest .pdf and .docx files. It maintains stable local document IDs, updates changed chunks, and removes stale chunks for the same imported document.
 - scripts/inspect_chroma_index.py — read-only inventory of indexed document IDs and exact chunk text repeated across IDs. It never deletes or modifies vectors.
+- scripts/cleanup_chroma_orphans.py — dry-run-first cleanup for chunks that have no `document_id` and exactly duplicate a chunk from the same filename under a valid document ID. Records with assigned IDs are never removed by this script.
 
 Preview an import without changing the vector database:
 
@@ -126,9 +127,10 @@ Inspect the current local index before considering any cleanup:
 ~~~powershell
 python scripts/inspect_chroma_index.py
 python scripts/inspect_chroma_index.py --match "Raksha Bandhan" --show-snippets
+python scripts/cleanup_chroma_orphans.py
 ~~~
 
-The audit is read-only. It reports exact-text chunks found under multiple document IDs, but overlapping content is not proof that one document is obsolete. Review the IDs, titles, filenames, and source documents before using the existing document-delete endpoint; never clear the entire collection to fix a duplicate-source issue.
+The audit is read-only. The cleanup command is also read-only unless you explicitly pass `--apply`; it only targets no-ID chunks that exactly duplicate content from the same file under a valid document ID, while rejecting conflicts in shared visibility/classification metadata. Review its dry-run output first, then use `python scripts/cleanup_chroma_orphans.py --apply` to delete those orphan duplicates. It never removes records with assigned document IDs. Different assigned IDs can still represent intentionally separate records, so do not delete those solely because their chunk text matches. Never clear the entire collection to fix a duplicate-source issue.
 
 ## Useful troubleshooting
 
