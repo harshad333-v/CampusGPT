@@ -184,7 +184,8 @@ async function sendMessageService({ sessionId, userId, message }) {
       semester: Number.isInteger(user.semester) ? user.semester : null,
     },
     accessible_document_ids: accessibleDocumentIds,
-    deny_document_retrieval: accessibleDocumentIds.length === 0,
+  }, {
+    denyDocumentRetrieval: accessibleDocumentIds.length === 0,
   });
 
   if (!aiResponse || typeof aiResponse.answer !== "string" || !aiResponse.answer.trim()) {
