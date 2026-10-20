@@ -13,7 +13,7 @@ from app.core.config import get_settings
 from app.rag.ingestion import ingest_document, infer_document_type
 from app.rag.vector_store import get_vector_store
 
-from local_indexing import metadata_for_file, replace_document_vectors
+from scripts.local_indexing import metadata_for_file, replace_document_vectors
 
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx"}
