@@ -126,6 +126,21 @@ class RAGPipeline:
             return False
 
         # ---------------------------------------------------------
+        # EXAM SCHEDULES AND EXAMINATION NOTICES
+        # ---------------------------------------------------------
+
+        if intent == "exam_schedule":
+            return any(
+                document.metadata.get("document_type")
+                in {
+                    "EXAM_SCHEDULE",
+                    "NOTICE",
+                    "CIRCULAR",
+                }
+                for document in documents
+            )
+
+        # ---------------------------------------------------------
         # SYLLABUS
         # ---------------------------------------------------------
 
