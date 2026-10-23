@@ -13,6 +13,8 @@ def get_llm() -> ChatOpenAI:
         base_url=settings.gemini_base_url,
         api_key=settings.gemini_api_key.get_secret_value(),
         temperature=0,
+        timeout=settings.generation_timeout_seconds,
+        max_retries=1,
     )
 
 
