@@ -371,7 +371,79 @@ A non-empty Chroma collection only proves that some chunks exist. It does not pr
 
 ## Docker Compose setup
 
-Docker Compose runs MongoDB, Ollama, ChromaDB, the FastAPI AI service, the backend, and frontend in containers. The Gemini Web2API gateway remains a separate process on the Windows host.
+Docker Compose is the recommended path for a new developer who wants to run CampusGPT without separately installing Node.js, Python, MongoDB, or Ollama on the host. Install **Git** and **Docker Desktop** only; Docker builds the application images and runs MongoDB, Ollama, ChromaDB, FastAPI, the Node backend, and the frontend in containers.
+
+**Important external dependency:** the current generation provider, Gemini Web2API, is not part of this repository or Compose stack. You must run your own OpenAI-compatible Gemini gateway on the host (default port 8081), or change `GEMINI_BASE_URL` and `GEMINI_MODEL` in `.env.fullstack` to point to a compatible gateway. The gateway must support `POST /v1/chat/completions`. Keep its authentication/cookie material private. The app can start without a working gateway, but AI-generated answers will not work until generation succeeds.
+
+### Fast setup on Windows
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and [Git](https://git-scm.com/downloads). Start Docker Desktop and wait until its engine is running.
+2. Clone this repository and enter its root folder:
+
+   ~~~powershell
+   git clone https://github.com/harshad333-v/CampusGPT.git
+   cd CampusGPT
+   git switch feature/rag-integration
+   ~~~
+
+3. Start/configure your Gemini-compatible gateway. The default Compose URL is `http://host.docker.internal:8081/v1`; check that `/v1/chat/completions` works before expecting chat answers.
+4. Run the setup helper. It creates `.env.fullstack` if missing, generates a unique JWT secret, checks Docker, validates Compose configuration, then builds and starts the containers:
+
+   ~~~powershell
+   .\scripts\setup_docker.ps1
+   ~~~
+
+   If PowerShell blocks local scripts, run this once in the current PowerShell process and retry:
+
+   ~~~powershell
+   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+   .\scripts\setup_docker.ps1
+   ~~~
+
+5. Open the app at **http://localhost:5173**. The first run may take several minutes while Docker downloads images and Ollama downloads the embedding model.
+6. Create an administrator and optionally index the sample documents using the commands in the bootstrap section below.
+
+Do not share or commit `.env.fullstack`. It contains a unique JWT secret and may contain gateway credentials. If you want to change gateway settings, edit `.env.fullstack` and restart the stack:
+
+~~~powershell
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml up -d
+~~~
+
+### Manual setup / other operating systems
+
+The same Compose file works on systems supported by Docker Desktop or Docker Engine with the Compose plugin. Create the environment file and a secret:
+
+~~~bash
+cp .env.fullstack.example .env.fullstack
+# Generate a secret, then paste it as JWT_SECRET in .env.fullstack:
+openssl rand -hex 48
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml config --quiet
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml up --build -d
+~~~
+
+On Windows PowerShell, use `Copy-Item .env.fullstack.example .env.fullstack` instead of `cp`. Replace the example JWT secret before starting. Set `GEMINI_BASE_URL` to an address reachable **from inside the AI container**. For Docker Desktop on Windows/macOS, `host.docker.internal` is normally the host address; on native Linux, configure a reachable host/gateway address for your environment.
+
+### Container operations
+
+~~~powershell
+# View status and health
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml ps
+
+# Follow logs
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml logs -f
+
+# Follow one service
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml logs -f ai-service
+
+# Restart after changing environment settings
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml up -d
+
+# Stop containers while preserving databases, vector index, model cache, and uploads
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml down
+~~~
+
+Do **not** use `down -v` unless you intentionally want to delete the named volumes, including MongoDB data, Chroma vectors, Ollama model downloads, and uploaded documents.
+
 
 ### 1. Configure Compose environment
 
@@ -518,12 +590,3 @@ Also sign in separately as an admin, teacher, and student. Test questions covere
 - A startup message saying a cookie file was loaded does not guarantee upstream authentication or successful generation. Test /v1/chat/completions.
 - Keep the AI service, MongoDB, Ollama, ChromaDB, and Gemini Web2API on local/private interfaces and networks. The browser should communicate only with the Node backend.
 - Backend role/document authorization is the security boundary; frontend route guards alone are not sufficient.
-- Rotate credentials disclosed in logs or source control. A public production deployment needs HTTPS, database authentication, restricted network access, backups, monitoring, and secrets management.
-- Docker Compose in this repository is intended for local integration/development, not a hardened production deployment.
-
-## Additional documentation
-
-- [Full-stack integration guide](README_FULLSTACK.md)
-- [AI service and indexing scripts](ai-services/README.md)
-- [Frontend](frontend/)
-- [Backend](backend/)
