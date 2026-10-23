@@ -132,6 +132,45 @@ python scripts/cleanup_chroma_orphans.py
 
 The audit is read-only. The cleanup command is also read-only unless you explicitly pass `--apply`; it only targets no-ID chunks that exactly duplicate content from the same file under a valid document ID, while rejecting conflicts in shared visibility/classification metadata. Review its dry-run output first, then use `python scripts/cleanup_chroma_orphans.py --apply` to delete those orphan duplicates. It never removes records with assigned document IDs. Different assigned IDs can still represent intentionally separate records, so do not delete those solely because their chunk text matches. Never clear the entire collection to fix a duplicate-source issue.
 
+## Embedding quality benchmark
+
+The local default remains `nomic-embed-text:latest`. To compare it with multilingual
+candidate `bge-m3`, first install the candidate in Ollama:
+
+~~~powershell
+ollama pull bge-m3
+ollama list
+~~~
+
+Prepare a UTF-8 JSONL file with representative queries, candidate chunk text, and
+manually labeled relevant document IDs. Include real queries from your users:
+English, Hindi/Hinglish, blood-donation notices, exams, timetable follow-ups, and
+near-miss documents. Each line follows this shape:
+
+~~~json
+{"query":"give me the information of the blood camp","documents":[{"id":"blood-notice","text":"Blood donation camp ..."},{"id":"exam-notice","text":"Semester exam schedule ..."}],"relevant_ids":["blood-notice"]}
+~~~
+
+Run the offline-label benchmark (it makes embedding calls to local Ollama but does
+not read or modify Chroma and does not change the active model):
+
+~~~powershell
+python scripts/benchmark_embeddings.py --dataset data/retrieval_eval.jsonl --models nomic-embed-text:latest,bge-m3 --top-k 3
+~~~
+
+Compare **Recall@K**, **MRR**, document embedding time, and average query embedding
+latency on the same labeled dataset. Do not select a model from a tiny synthetic
+set; use enough held-out examples across document types and language variants.
+BGE-M3 is a candidate, not a guaranteed improvement. Model quality should be
+measured on CampusGPT's own corpus.
+
+**Important:** vectors created by different embedding models are not compatible.
+Before switching, back up the current collection, use a new collection name for
+the candidate model, re-ingest/re-embed all authorized documents, run retrieval
+and authorization regression tests, then promote the new collection only after
+the evaluation passes. Keep Gemini as the generation model; embedding selection
+does not replace generation.
+
 ## Useful troubleshooting
 
 - **Ollama connection refused:** start the Ollama app/service and confirm port 11434.
