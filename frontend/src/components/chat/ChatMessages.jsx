@@ -5,7 +5,8 @@ import {
   ThumbsUpIcon,
   ThumbsDownIcon,
 } from "./ChatIcons";
-
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 function ChatMessages({
   messages,
   loadingMessages,
@@ -126,9 +127,59 @@ function ChatMessages({
                       </div>
                     </div>
                   ) : (
-                    <p className="whitespace-pre-wrap break-words text-sm leading-7">
-                      {message.message}
-                    </p>
+                    <div
+  className={`markdown-content break-words text-sm leading-7 ${
+    isUser ? "whitespace-pre-wrap" : ""
+  }`}
+>
+  {isUser ? (
+    message.message
+  ) : (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        a: ({ node, ...props }) => (
+          <a
+            {...props}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline dark:text-blue-400"
+          />
+        ),
+        h1: ({ node, ...props }) => (
+          <h1 {...props} className="mb-3 mt-4 text-xl font-bold" />
+        ),
+        h2: ({ node, ...props }) => (
+          <h2 {...props} className="mb-2 mt-4 text-lg font-semibold" />
+        ),
+        h3: ({ node, ...props }) => (
+          <h3 {...props} className="mb-2 mt-3 text-base font-semibold" />
+        ),
+        p: ({ node, ...props }) => (
+          <p {...props} className="mb-3 last:mb-0" />
+        ),
+        ul: ({ node, ...props }) => (
+          <ul {...props} className="mb-3 list-disc space-y-1 pl-6" />
+        ),
+        ol: ({ node, ...props }) => (
+          <ol {...props} className="mb-3 list-decimal space-y-1 pl-6" />
+        ),
+        li: ({ node, ...props }) => <li {...props} />,
+        strong: ({ node, ...props }) => (
+          <strong {...props} className="font-semibold" />
+        ),
+        code: ({ node, className, ...props }) => (
+          <code
+            {...props}
+            className={`${className || ""} rounded bg-slate-100 px-1 py-0.5 dark:bg-white/10`}
+          />
+        ),
+      }}
+    >
+      {message.message || ""}
+    </ReactMarkdown>
+  )}
+</div>
                   )}
                   {!isUser && !isEditing && Array.isArray(message.sources) && message.sources.length > 0 && (
                     <div className="mt-4 border-t border-slate-200 pt-3 dark:border-white/[0.08]">
