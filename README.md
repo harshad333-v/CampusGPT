@@ -514,6 +514,22 @@ docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml down
 
 Do not add -v unless you intend to delete MongoDB, ChromaDB, Ollama model data, and uploaded document volumes.
 
+### Chat answer quality: relative days and Hinglish
+
+The AI service passes India-local calendar context (`Asia/Kolkata`) to the answer generator so phrases such as `kal` can be interpreted as tomorrow. The answer prompt also asks the model to match the user's language and answer the question directly.
+
+Calendar context is **not** proof of a college rule. For example, if tomorrow is Sunday and the retrieved timetable lists classes only Monday through Saturday, the assistant should say in Hinglish that no Sunday class is shown in the available timetable and recommend checking an official notice for exceptions. It must not assert that the college is definitely closed unless an authorized timetable or notice supports that claim.
+
+After pulling this change, rebuild the AI container so the updated prompt is loaded:
+
+~~~powershell
+git pull --ff-only
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml up --build -d ai-service
+docker compose --env-file .env.fullstack -f docker-compose.fullstack.yml logs -f ai-service
+~~~
+
+Try questions such as `kal class hai?`, `kal Sunday ko class hai?`, `is there class tomorrow?`, and `Monday ko meri class kab hai?`. Check that answers match the user's language, use the correct India-local weekday, don't overstate unsupported claims, and cite only the retrieved sources actually used. These are regression checks; actual responses still depend on the timetable's extracted text and the configured generation gateway.
+
 ## Tests and verification
 
 Run the relevant tests from each service folder.
