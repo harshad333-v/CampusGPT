@@ -37,6 +37,10 @@ GREETING_PATTERNS = {
     "good afternoon",
     "good evening",
     "good night",
+    "bye",
+    "goodbye",
+    "see you",
+    "see ya",
 }
 
 
@@ -160,7 +164,6 @@ DOCUMENT_KEYWORDS = {
     "donation camp",
     "donation drive",
     "blood drive",
-    "camp",
     "organ donation",
     "health camp",
     "celebration",
@@ -281,7 +284,6 @@ INTENT_KEYWORDS = {
         "donation camp",
         "donation drive",
         "blood drive",
-        "camp",
         "organ donation",
         "health camp",
         "celebration",
@@ -577,44 +579,27 @@ def detect_intent(text: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 def is_greeting(text: str) -> bool:
-    """
-    Detect simple greetings without invoking an LLM.
-    """
+    """Detect greetings, small talk, acknowledgements, and short help requests."""
 
     lowered = text.lower().strip()
-
-    # Exact match
-    if lowered in GREETING_PATTERNS:
-        return True
-
-    # Handle punctuation:
-    #
-    # Hi!
-    # Hello!!!
-    # Hey?
-    #
     cleaned = re.sub(
         r"[^\w\s\u0900-\u097F]",
         "",
         lowered,
-    ).strip()
+    )
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
     if cleaned in GREETING_PATTERNS:
         return True
 
-    # Common casual conversation and short help requests should not be
-    # rejected by the campus-document classifier.
-    casual = re.sub(r"\\s+", " ", cleaned).strip()
-    if casual in GREETING_PATTERNS:
-        return True
-
-    # Handle texting shorthand and small-talk variations such as "how r u?".
+    # Support common variations without making the list of exact phrases
+    # the only path for ordinary conversation.
     return bool(re.fullmatch(
-        r"(?:how\\s+(?:are|r)\\s+(?:you|u)(?:\\s+doing)?|"
-        r"how\\s+you\\s+doing|what(?:'s|s|\\s+is)\\s+up|"
-        r"can\\s+you\\s+help(?:\\s+me)?|help\\s+(?:me|u)|"
-        r"what\\s+can\\s+you\\s+do)",
-        casual,
+        r"(?:how\s+(?:are|r)\s+(?:you|u)(?:\s+doing)?|"
+        r"how\s+you\s+doing|what(?:'s|s|\s+is)\s+up|"
+        r"can\s+you\s+help(?:\s+me)?|help\s+(?:me|u)|"
+        r"what\s+can\s+you\s+do)",
+        cleaned,
     ))
 
 
