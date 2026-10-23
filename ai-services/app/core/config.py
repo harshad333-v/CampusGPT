@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.6-flash"
     gemini_base_url: str = "http://127.0.0.1:8081/v1"
     gemini_api_key: SecretStr = SecretStr("not-needed")
+    generation_timeout_seconds: float = Field(default=45.0, gt=0, le=300)
 
     # Local defaults preserve current development behavior.
     embedding_provider: Literal["ollama", "voyage"] = "ollama"
