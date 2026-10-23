@@ -25,7 +25,11 @@ def test_health():
 # Chat - Greeting
 # -------------------------------------------------------------------
 
-def test_chat_greeting():
+def test_chat_greeting(monkeypatch):
+    monkeypatch.setattr(
+        "app.rag.pipeline.generate_chat_response",
+        lambda query, conversation=None: "Hello! How can I help you with CampusGPT?",
+    )
     response = client.post(
         "/v1/chat",
         json={
@@ -211,8 +215,6 @@ import pytest
     "thanks", "what can you do?", "bye", "goodbye",
 ])
 def test_chat_casual_conversation(message, monkeypatch):
-    from app.rag.pipeline import RAGPipeline
-
     monkeypatch.setattr(
         "app.rag.pipeline.generate_chat_response",
         lambda query, conversation=None: "Hello! I can help. What do you need?",
