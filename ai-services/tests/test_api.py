@@ -199,3 +199,41 @@ def test_chat_empty_message():
     )
 
     assert response.status_code == 422
+
+# -------------------------------------------------------------------
+# Chat - Casual conversation and shorthand
+# -------------------------------------------------------------------
+
+import pytest
+
+@pytest.mark.parametrize("message", [
+    "hey", "help u", "how r u", "how are you?", "good morning",
+    "thanks", "what can you do?",
+])
+def test_chat_casual_conversation(message, monkeypatch):
+    from app.rag.pipeline import RAGPipeline
+
+    monkeypatch.setattr(
+        "app.rag.pipeline.generate_chat_response",
+        lambda query, conversation=None: "Hello! I can help. What do you need?",
+    )
+    response = client.post(
+        "/v1/chat",
+        json={
+            "message": message,
+            "conversation": [],
+            "user_context": None,
+            "accessible_document_ids": [],
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["query_type"] == "GREETING"
+    assert "help" in response.json()["answer"].lower()
+
+
+def test_blood_donation_camp_is_classified_as_event():
+    from app.nlp.classifier import classify_query
+
+    result = classify_query("give me the information of the blood camp")
+    assert result.query_type == "DOCUMENT"
+    assert result.intent == "event"
