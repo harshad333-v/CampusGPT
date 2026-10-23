@@ -155,12 +155,13 @@ Run the offline-label benchmark (it makes embedding calls to local Ollama but do
 not read or modify Chroma and does not change the active model):
 
 ~~~powershell
-python scripts/benchmark_embeddings.py --dataset data/retrieval_eval.jsonl --models nomic-embed-text:latest,bge-m3 --top-k 3
+python scripts/benchmark_embeddings.py --dataset data/retrieval_eval.example.jsonl --models nomic-embed-text:latest,bge-m3 --top-k 3
 ~~~
 
-Compare **Recall@K**, **MRR**, document embedding time, and average query embedding
-latency on the same labeled dataset. Do not select a model from a tiny synthetic
-set; use enough held-out examples across document types and language variants.
+The checked-in example dataset is only a smoke test to confirm the benchmark runs;
+it is synthetic and is not enough to choose a model. Replace or extend it with real,
+representative labeled queries and document chunks. Compare **Recall@K**, **MRR**,
+document embedding time, and average query embedding latency on the same held-out set.
 BGE-M3 is a candidate, not a guaranteed improvement. Model quality should be
 measured on CampusGPT's own corpus.
 
