@@ -41,3 +41,30 @@ def test_event_notice_with_generic_event_query_requires_event_evidence():
     pipeline = RAGPipeline()
     assert pipeline._documents_are_relevant(query, [relevant]) is True
     assert pipeline._documents_are_relevant(query, [unrelated]) is False
+
+def test_timetable_answer_prompt_handles_hinglish_relative_days(monkeypatch):
+    from app.rag import generator
+
+    captured = {}
+
+    class FakeResponse:
+        content = "Kal Sunday hai. Available timetable mein Sunday ki class listed nahi hai; official notice check kar lena."
+
+    class FakeLLM:
+        def invoke(self, prompt):
+            captured["prompt"] = prompt
+            return FakeResponse()
+
+    monkeypatch.setattr(generator, "get_llm", lambda: FakeLLM())
+
+    answer = generator.generate_answer(
+        query="kal class hai",
+        context="B.Tech V(B) timetable. Monday through Saturday class entries are listed.",
+        intent="timetable",
+    )
+
+    assert "Kal Sunday hai" in answer
+    assert "Asia-Kolkata" in captured["prompt"]
+    assert "Match the user's language" in captured["prompt"]
+    assert "do not assume that a college is closed merely because it is Sunday" in captured["prompt"]
+
