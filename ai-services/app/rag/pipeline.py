@@ -6,7 +6,7 @@ from app.models.chat import ConversationMessage
 from app.nlp.router import QueryRouter
 from app.nlp.service import NLPService
 from app.rag.context_builder import build_context
-from app.rag.generator import generate_answer
+from app.rag.generator import generate_answer, generate_chat_response
 from app.rag.retriever import retrieve_documents_with_metadata
 
 
@@ -184,13 +184,23 @@ class RAGPipeline:
         # ---------------------------------------------------------
 
         if intent == "event":
-
+            # Event/notice metadata is not always normalized on upload.
+            # Semantic retrieval already ranks candidates for this query;
+            # accept retrieved notice-like documents even if their metadata
+            # is absent, so valid uploaded camp notices are not discarded.
             return any(
                 document.metadata.get("document_type")
-                in {
-                    "NOTICE",
-                    "EVENT_NOTICE",
-                }
+                in {"NOTICE", "EVENT_NOTICE", "CIRCULAR", "EVENT"}
+                or any(
+                    term in (
+                        str(document.metadata.get("title", "")) + " "
+                        + str(document.metadata.get("source", "")) + " "
+                        + document.page_content
+                    ).lower()
+                    for term in (
+                        "blood", "donation", "camp", "event", "notice"
+                    )
+                )
                 for document in documents
             )
 
@@ -252,8 +262,9 @@ class RAGPipeline:
         if route == "GREETING":
 
             return RAGResult(
-                answer=(
-                    "Hello! How can I help you with CampusGPT?"
+                answer=generate_chat_response(
+                    query=query,
+                    conversation=conversation,
                 ),
                 documents=[],
                 grounded=False,
@@ -266,12 +277,9 @@ class RAGPipeline:
         if route == "FALLBACK":
 
             return RAGResult(
-                answer=(
-                    "I can help with information available "
-                    "through CampusGPT. Please ask a question "
-                    "related to your college, courses, exams, "
-                    "timetable, notices, holidays, or other "
-                    "campus information."
+                answer=generate_chat_response(
+                    query=query,
+                    conversation=conversation,
                 ),
                 documents=[],
                 grounded=False,
