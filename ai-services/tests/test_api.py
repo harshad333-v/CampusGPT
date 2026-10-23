@@ -208,7 +208,7 @@ import pytest
 
 @pytest.mark.parametrize("message", [
     "hey", "help u", "how r u", "how are you?", "good morning",
-    "thanks", "what can you do?",
+    "thanks", "what can you do?", "bye", "goodbye",
 ])
 def test_chat_casual_conversation(message, monkeypatch):
     from app.rag.pipeline import RAGPipeline
@@ -237,3 +237,10 @@ def test_blood_donation_camp_is_classified_as_event():
     result = classify_query("give me the information of the blood camp")
     assert result.query_type == "DOCUMENT"
     assert result.intent == "event"
+
+
+def test_campus_word_is_not_misclassified_as_event():
+    from app.nlp.classifier import classify_query
+
+    result = classify_query("Tell me about campus facilities")
+    assert result.intent != "event"
