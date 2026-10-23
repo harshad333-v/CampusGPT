@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import logging
 
 from langchain_core.documents import Document
 
@@ -6,8 +7,11 @@ from app.models.chat import ConversationMessage
 from app.nlp.router import QueryRouter
 from app.nlp.service import NLPService
 from app.rag.context_builder import build_context
-from app.rag.generator import generate_answer
+from app.rag.generator import generate_answer, generate_chat_response
 from app.rag.retriever import retrieve_documents_with_metadata
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -184,15 +188,39 @@ class RAGPipeline:
         # ---------------------------------------------------------
 
         if intent == "event":
-
-            return any(
-                document.metadata.get("document_type")
-                in {
-                    "NOTICE",
-                    "EVENT_NOTICE",
-                }
-                for document in documents
-            )
+            # Do not require normalized document_type metadata: uploads may be
+            # tagged inconsistently. But do require evidence related to the
+            # requested event so an unrelated NOTICE cannot become grounded.
+            query_text = str(nlp_result.normalized_query or "").lower()
+            query_topics = [
+                term for term in (
+                    "blood", "donation", "organ", "health", "camp",
+                    "event", "celebration", "function", "drive",
+                )
+                if term in query_text
+            ]
+            for document in documents:
+                metadata = document.metadata
+                document_text = " ".join((
+                    str(metadata.get("title", "")),
+                    str(metadata.get("source", "")),
+                    str(metadata.get("file_name", "")),
+                    document.page_content,
+                )).lower()
+                if query_topics:
+                    if any(term in document_text for term in query_topics):
+                        return True
+                elif (
+                    metadata.get("document_type") in {
+                        "EVENT", "EVENT_NOTICE", "NOTICE", "CIRCULAR"
+                    }
+                    and any(term in document_text for term in (
+                        "event", "celebration", "function", "camp",
+                        "blood", "donation", "drive",
+                    ))
+                ):
+                    return True
+            return False
 
         # ---------------------------------------------------------
         # GENERIC DOCUMENT QUERY
@@ -250,32 +278,36 @@ class RAGPipeline:
         # ---------------------------------------------------------
 
         if route == "GREETING":
-
-            return RAGResult(
-                answer=(
-                    "Hello! How can I help you with CampusGPT?"
-                ),
-                documents=[],
-                grounded=False,
-            )
+            try:
+                answer = generate_chat_response(
+                    query=query,
+                    conversation=conversation,
+                )
+            except Exception:
+                logger.exception("Chat generation failed for a conversational message")
+                answer = (
+                    "I'm having trouble reaching the chat service right now. "
+                    "Please try again in a moment."
+                )
+            return RAGResult(answer=answer, documents=[], grounded=False)
 
         # ---------------------------------------------------------
         # UNSUPPORTED
         # ---------------------------------------------------------
 
         if route == "FALLBACK":
-
-            return RAGResult(
-                answer=(
-                    "I can help with information available "
-                    "through CampusGPT. Please ask a question "
-                    "related to your college, courses, exams, "
-                    "timetable, notices, holidays, or other "
-                    "campus information."
-                ),
-                documents=[],
-                grounded=False,
-            )
+            try:
+                answer = generate_chat_response(
+                    query=query,
+                    conversation=conversation,
+                )
+            except Exception:
+                logger.exception("Chat generation failed for a fallback message")
+                answer = (
+                    "I'm having trouble reaching the chat service right now. "
+                    "Please try again in a moment."
+                )
+            return RAGResult(answer=answer, documents=[], grounded=False)
 
         # An empty access allow-list is ambiguous in the legacy public API.
         # The trusted backend can set this explicit flag when authorization found
@@ -330,12 +362,23 @@ class RAGPipeline:
         # GENERATION
         # ---------------------------------------------------------
 
-        answer = generate_answer(
-            query=nlp_result.normalized_query,
-            context=context,
-            intent=nlp_result.intent,
-            conversation=conversation,
-        )
+        try:
+            answer = generate_answer(
+                query=nlp_result.normalized_query,
+                context=context,
+                intent=nlp_result.intent,
+                conversation=conversation,
+            )
+        except Exception:
+            logger.exception("Grounded answer generation failed")
+            return RAGResult(
+                answer=(
+                    "I found potentially relevant college documents, but the "
+                    "answer service is temporarily unavailable. Please try again."
+                ),
+                documents=[],
+                grounded=False,
+            )
 
         # ---------------------------------------------------------
         # RESULT

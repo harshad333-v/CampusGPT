@@ -18,6 +18,29 @@ GREETING_PATTERNS = {
     "नमस्ते",
     "हाय",
     "हेलो",
+    "yo",
+    "sup",
+    "how are you",
+    "how are u",
+    "how r u",
+    "how are you doing",
+    "how r you",
+    "what is up",
+    "whats up",
+    "what can you do",
+    "can you help me",
+    "help me",
+    "help u",
+    "thanks",
+    "thank you",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "good night",
+    "bye",
+    "goodbye",
+    "see you",
+    "see ya",
 }
 
 
@@ -136,6 +159,13 @@ DOCUMENT_KEYWORDS = {
 
     "event",
     "events",
+    "blood camp",
+    "blood donation",
+    "donation camp",
+    "donation drive",
+    "blood drive",
+    "organ donation",
+    "health camp",
     "celebration",
     "celebrations",
     "function",
@@ -249,6 +279,13 @@ INTENT_KEYWORDS = {
     "event": {
         "event",
         "events",
+        "blood camp",
+        "blood donation",
+        "donation camp",
+        "donation drive",
+        "blood drive",
+        "organ donation",
+        "health camp",
         "celebration",
         "celebrations",
         "function",
@@ -542,29 +579,28 @@ def detect_intent(text: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 def is_greeting(text: str) -> bool:
-    """
-    Detect simple greetings without invoking an LLM.
-    """
+    """Detect greetings, small talk, acknowledgements, and short help requests."""
 
     lowered = text.lower().strip()
-
-    # Exact match
-    if lowered in GREETING_PATTERNS:
-        return True
-
-    # Handle punctuation:
-    #
-    # Hi!
-    # Hello!!!
-    # Hey?
-    #
     cleaned = re.sub(
         r"[^\w\s\u0900-\u097F]",
         "",
         lowered,
-    ).strip()
+    )
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
-    return cleaned in GREETING_PATTERNS
+    if cleaned in GREETING_PATTERNS:
+        return True
+
+    # Support common variations without making the list of exact phrases
+    # the only path for ordinary conversation.
+    return bool(re.fullmatch(
+        r"(?:how\s+(?:are|r)\s+(?:you|u)(?:\s+doing)?|"
+        r"how\s+you\s+doing|what(?:'s|s|\s+is)\s+up|"
+        r"can\s+you\s+help(?:\s+me)?|help\s+(?:me|u)|"
+        r"what\s+can\s+you\s+do)",
+        cleaned,
+    ))
 
 
 # ---------------------------------------------------------------------------

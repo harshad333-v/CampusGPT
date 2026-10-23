@@ -13,6 +13,8 @@ def get_llm() -> ChatOpenAI:
         base_url=settings.gemini_base_url,
         api_key=settings.gemini_api_key.get_secret_value(),
         temperature=0,
+        timeout=settings.generation_timeout_seconds,
+        max_retries=1,
     )
 
 
@@ -164,4 +166,37 @@ ANSWER:
             "expected a string answer."
         )
 
+    return content.strip()
+
+
+
+def generate_chat_response(
+    query: str,
+    conversation: list[ConversationMessage] | None = None,
+) -> str:
+    """Answer greetings and ordinary small-talk without requiring document context."""
+
+    conversation_context = build_conversation_context(conversation or [])
+    prompt = f"""
+You are CampusGPT, a friendly and helpful university assistant.
+Respond naturally to greetings, small talk, thanks, and general conversational
+messages. Be concise, warm, and useful. If the user asks for help, ask what they
+need and mention that you can help with campus notices, courses, exams, and
+other university information. Do not claim facts about the user's university
+unless they are supplied in the conversation. If the user asks a factual campus
+question, invite them to ask it directly so the document-grounded campus search
+can answer it.
+
+Conversation history:
+{conversation_context or "No previous conversation."}
+
+Current user message:
+{query}
+
+Reply:
+"""
+    response = get_llm().invoke(prompt)
+    content = response.content
+    if not isinstance(content, str):
+        raise TypeError("The model returned a non-text response; expected a string answer.")
     return content.strip()

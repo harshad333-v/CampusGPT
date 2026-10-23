@@ -25,7 +25,11 @@ def test_health():
 # Chat - Greeting
 # -------------------------------------------------------------------
 
-def test_chat_greeting():
+def test_chat_greeting(monkeypatch):
+    monkeypatch.setattr(
+        "app.rag.pipeline.generate_chat_response",
+        lambda query, conversation=None: "Hello! How can I help you with CampusGPT?",
+    )
     response = client.post(
         "/v1/chat",
         json={
@@ -199,3 +203,72 @@ def test_chat_empty_message():
     )
 
     assert response.status_code == 422
+
+# -------------------------------------------------------------------
+# Chat - Casual conversation and shorthand
+# -------------------------------------------------------------------
+
+import pytest
+
+@pytest.mark.parametrize("message", [
+    "hey", "help u", "how r u", "how are you?", "good morning",
+    "thanks", "what can you do?", "bye", "goodbye",
+])
+def test_chat_casual_conversation(message, monkeypatch):
+    monkeypatch.setattr(
+        "app.rag.pipeline.generate_chat_response",
+        lambda query, conversation=None: "Hello! I can help. What do you need?",
+    )
+    response = client.post(
+        "/v1/chat",
+        json={
+            "message": message,
+            "conversation": [],
+            "user_context": None,
+            "accessible_document_ids": [],
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["query_type"] == "GREETING"
+    assert "help" in response.json()["answer"].lower()
+
+
+def test_blood_donation_camp_is_classified_as_event():
+    from app.nlp.classifier import classify_query
+
+    result = classify_query("give me the information of the blood camp")
+    assert result.query_type == "DOCUMENT"
+    assert result.intent == "event"
+
+
+def test_campus_word_is_not_misclassified_as_event():
+    from app.nlp.classifier import classify_query
+
+    result = classify_query("Tell me about campus facilities")
+    assert result.intent != "event"
+
+
+def test_chat_greeting_gateway_failure_returns_friendly_answer(monkeypatch):
+    def fail_generation(query, conversation=None):
+        raise TimeoutError("gateway timeout")
+
+    monkeypatch.setattr(
+        "app.rag.pipeline.generate_chat_response",
+        fail_generation,
+    )
+    response = client.post(
+        "/v1/chat",
+        json={
+            "message": "hey",
+            "conversation": [],
+            "user_context": None,
+            "accessible_document_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["query_type"] == "GREETING"
+    assert data["grounded"] is False
+    assert "try again" in data["answer"].lower()
+    assert data["sources"] == []
