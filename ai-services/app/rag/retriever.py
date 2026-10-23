@@ -296,14 +296,10 @@ def build_metadata_filter(
     # ===============================================================
 
     elif intent == "event":
-
-        # Event information may be stored under either notice type.
-        conditions.append(
-            _in(
-                "document_type",
-                ["NOTICE", "EVENT_NOTICE"],
-            )
-        )
+        # Notices are frequently uploaded with missing or inconsistent
+        # document_type metadata. Keep the event search semantic and only
+        # apply the trusted access-control filter below.
+        pass
 
     # ===============================================================
     # Generic document_type entity
