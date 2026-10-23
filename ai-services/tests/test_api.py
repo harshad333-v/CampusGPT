@@ -246,3 +246,29 @@ def test_campus_word_is_not_misclassified_as_event():
 
     result = classify_query("Tell me about campus facilities")
     assert result.intent != "event"
+
+
+def test_chat_greeting_gateway_failure_returns_friendly_answer(monkeypatch):
+    def fail_generation(query, conversation=None):
+        raise TimeoutError("gateway timeout")
+
+    monkeypatch.setattr(
+        "app.rag.pipeline.generate_chat_response",
+        fail_generation,
+    )
+    response = client.post(
+        "/v1/chat",
+        json={
+            "message": "hey",
+            "conversation": [],
+            "user_context": None,
+            "accessible_document_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["query_type"] == "GREETING"
+    assert data["grounded"] is False
+    assert "try again" in data["answer"].lower()
+    assert data["sources"] == []
