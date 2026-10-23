@@ -18,6 +18,25 @@ GREETING_PATTERNS = {
     "नमस्ते",
     "हाय",
     "हेलो",
+    "yo",
+    "sup",
+    "how are you",
+    "how are u",
+    "how r u",
+    "how are you doing",
+    "how r you",
+    "what is up",
+    "whats up",
+    "what can you do",
+    "can you help me",
+    "help me",
+    "help u",
+    "thanks",
+    "thank you",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "good night",
 }
 
 
@@ -136,6 +155,14 @@ DOCUMENT_KEYWORDS = {
 
     "event",
     "events",
+    "blood camp",
+    "blood donation",
+    "donation camp",
+    "donation drive",
+    "blood drive",
+    "camp",
+    "organ donation",
+    "health camp",
     "celebration",
     "celebrations",
     "function",
@@ -249,6 +276,14 @@ INTENT_KEYWORDS = {
     "event": {
         "event",
         "events",
+        "blood camp",
+        "blood donation",
+        "donation camp",
+        "donation drive",
+        "blood drive",
+        "camp",
+        "organ donation",
+        "health camp",
         "celebration",
         "celebrations",
         "function",
@@ -564,7 +599,23 @@ def is_greeting(text: str) -> bool:
         lowered,
     ).strip()
 
-    return cleaned in GREETING_PATTERNS
+    if cleaned in GREETING_PATTERNS:
+        return True
+
+    # Common casual conversation and short help requests should not be
+    # rejected by the campus-document classifier.
+    casual = re.sub(r"\\s+", " ", cleaned).strip()
+    if casual in GREETING_PATTERNS:
+        return True
+
+    # Handle texting shorthand and small-talk variations such as "how r u?".
+    return bool(re.fullmatch(
+        r"(?:how\\s+(?:are|r)\\s+(?:you|u)(?:\\s+doing)?|"
+        r"how\\s+you\\s+doing|what(?:'s|s|\\s+is)\\s+up|"
+        r"can\\s+you\\s+help(?:\\s+me)?|help\\s+(?:me|u)|"
+        r"what\\s+can\\s+you\\s+do)",
+        casual,
+    ))
 
 
 # ---------------------------------------------------------------------------
